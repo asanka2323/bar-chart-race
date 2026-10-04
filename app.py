@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
-from moviepy import VideoClip
+from moviepy.video.VideoClip import VideoClip
 
 # ---------------------------------------------------------
 # 1. EASING & ANIMATION STYLES ENGINE

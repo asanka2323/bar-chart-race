@@ -1,7 +1,5 @@
-opencv-python-headless
-numpy
+streamlit
 pandas
 pillow
-moviepy
-requests
-streamlit
+opencv-python-headless
+moviepy>=2.0.0
