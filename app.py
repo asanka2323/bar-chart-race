@@ -22,6 +22,12 @@ COUNTRY_ISO_MAP = {
     "uzbekistan": "uz"
 }
 
+In the complete `app.py` script provided earlier, the `get_flag_url()` function starts around **Line 21**.
+
+Here is the exact block (Lines 21 to 29) to replace in `app.py`:
+
+```python
+# BEFORE (around line 21):
 def get_flag_url(category_name, given_flag_url=None):
     if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
         return str(given_flag_url).strip()
@@ -30,6 +36,30 @@ def get_flag_url(category_name, given_flag_url=None):
     if iso:
         return f"https://flagcdn.com/w160/{iso}.png"
     return None
+
+```
+
+---
+
+### Replace with this updated block:
+
+```python
+# AFTER (around line 21):
+def get_flag_url(category_name, given_flag_url=None):
+    if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
+        url_str = str(given_flag_url).strip()
+        # Converts Wikimedia SVG links to PNG thumbnails automatically so PIL can load them
+        if "wikimedia.org" in url_str and url_str.endswith(".svg") and "?width=" not in url_str:
+            url_str += "?width=200"
+        return url_str
+
+    clean_name = str(category_name).strip().lower()
+    iso = COUNTRY_ISO_MAP.get(clean_name)
+    if iso:
+        return f"https://flagcdn.com/w160/{iso}.png"
+    return None
+
+```
 
 def load_circular_image(url_or_path):
     if not url_or_path or pd.isna(url_or_path) or str(url_or_path).strip() == "":
