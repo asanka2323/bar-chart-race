@@ -5,30 +5,45 @@ import requests
 import numpy as np
 import pandas as pd
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from moviepy import VideoClip
 
 # ---------------------------------------------------------
-# CACHE DIRECTORY FOR IMAGES / FLAGS
+# COUNTRY ISO MAP FOR AUTO-FLAG LOOKUP
 # ---------------------------------------------------------
-CACHE_DIR = "cache"
-os.makedirs(CACHE_DIR, exist_ok=True)
+COUNTRY_ISO_MAP = {
+    "united states": "us", "usa": "us", "japan": "jp", "germany": "de",
+    "france": "fr", "spain": "es", "south korea": "kr", "china": "cn",
+    "mexico": "mx", "brazil": "br", "malaysia": "my", "indonesia": "id",
+    "italy": "it", "united kingdom": "gb", "uk": "gb", "canada": "ca",
+    "india": "in", "russia": "ru", "russian federation": "ru",
+    "poland": "pl", "portugal": "pt", "romania": "ro", "slovakia": "sk",
+    "south africa": "za", "sweden": "se", "thailand": "th", "turkey": "tr",
+    "uzbekistan": "uz"
+}
 
-IMAGE_CACHE = {}
+def get_flag_url(category_name, given_flag_url=None):
+    if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
+        return str(given_flag_url).strip()
+    clean_name = str(category_name).strip().lower()
+    iso = COUNTRY_ISO_MAP.get(clean_name)
+    if iso:
+        return f"https://flagcdn.com/w160/{iso}.png"
+    return None
 
-def get_image(url_or_path):
-    """Downloads or loads an image and caches it in memory."""
+def load_circular_image(url_or_path):
     if not url_or_path or pd.isna(url_or_path) or str(url_or_path).strip() == "":
         return None
-    
     url_str = str(url_or_path).strip()
-    if url_str in IMAGE_CACHE:
-        return IMAGE_CACHE[url_str]
     
     try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         if url_str.startswith("http://") or url_str.startswith("https://"):
-            response = requests.get(url_str, timeout=3)
-            img = Image.open(io.BytesIO(response.content)).convert("RGBA")
+            res = requests.get(url_str, headers=headers, timeout=5)
+            if res.status_code == 200:
+                img = Image.open(io.BytesIO(res.content)).convert("RGBA")
+            else:
+                return None
         elif os.path.exists(url_str):
             img = Image.open(url_str).convert("RGBA")
         else:
@@ -37,13 +52,35 @@ def get_image(url_or_path):
         w, h = img.size
         min_dim = min(w, h)
         img_cropped = img.crop(((w - min_dim) // 2, (h - min_dim) // 2, (w + min_dim) // 2, (h + min_dim) // 2))
-        IMAGE_CACHE[url_str] = img_cropped
-        return img_cropped
+        
+        mask = Image.new('L', (min_dim, min_dim), 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, min_dim, min_dim), fill=255)
+        
+        circular_img = Image.new('RGBA', (min_dim, min_dim), (0, 0, 0, 0))
+        circular_img.paste(img_cropped, (0, 0), mask=mask)
+        return circular_img
     except Exception:
         return None
 
+def fetch_all_flags(df):
+    flag_dict = {}
+    categories = df['Category'].unique()
+    for cat in categories:
+        given_flag = None
+        if 'Flag' in df.columns:
+            sub = df[df['Category'] == cat]
+            if not sub.empty:
+                given_flag = sub['Flag'].iloc[0]
+        url = get_flag_url(cat, given_flag)
+        if url:
+            img = load_circular_image(url)
+            if img:
+                flag_dict[cat] = img
+    return flag_dict
+
 # ---------------------------------------------------------
-# EASING & DRAWING UTILITIES
+# DRAWING UTILITIES
 # ---------------------------------------------------------
 def ease_in_out_cubic(t):
     return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
@@ -60,8 +97,8 @@ def draw_rounded_rect(draw, xy, corner_radius, fill=None):
     draw.pieslice([x2 - 2 * corner_radius, y2 - 2 * corner_radius, x2, y2], 0, 90, fill=fill)
 
 DEFAULT_PALETTE = [
-    "#00FF99", "#BA55D3", "#00BFFF", "#FFBF00", "#FF0080",
-    "#7FFF00", "#FF4500", "#00EEEE", "#FFD700", "#FF1493"
+    "#FFD700", "#00BFFF", "#00EEEE", "#FF4500", "#FF0080",
+    "#BA55D3", "#7FFF00", "#00FF99", "#FFBF00", "#FF1493"
 ]
 
 def hex_to_rgb(hex_str):
@@ -69,16 +106,19 @@ def hex_to_rgb(hex_str):
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
 # ---------------------------------------------------------
-# VERTICAL FRAME RENDERER (720 x 1280 - FAST & MEMORY EFFICIENT)
+# FRAME RENDERER
 # ---------------------------------------------------------
-def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RACE", subtitle="CYBERPUNK EDITION", width=720, height=1280):
+def render_cyberpunk_frame(df_frame, year_label, color_map, loaded_flags, title="BAR CHART RACE", subtitle="CYBERPUNK EDITION", width=720, height=1280):
     bg_color = (13, 17, 23)
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
     top_margin = 180
     bottom_margin = 80
-    left_margin = 210
+    
+    label_left = 30
+    flag_x = 210          # Flag centered in the 210-280 gap
+    left_margin = 280     # Bar starts at 280
     right_margin = 120
     
     chart_width = width - left_margin - right_margin
@@ -103,7 +143,6 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RAC
         cat_name = str(row['Category'])
         val = row['Value']
         rank = row['Rank']
-        flag_url = row.get('Flag', None)
 
         if rank > top_n + 0.5:
             continue
@@ -114,30 +153,39 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RAC
         color_hex = color_map.get(cat_name, "#00FF99")
         color_rgb = hex_to_rgb(color_hex)
 
-        # Flag / Icon
-        icon_img = get_image(flag_url)
-        icon_size = int(bar_height * 1.1)
+        # 1. Text Label (Country Name)
+        draw.text((label_left, y_pos + bar_height / 4), cat_name[:14], fill=(255, 255, 255))
+
+        # 2. Flag Image Placement
+        icon_img = loaded_flags.get(cat_name)
+        icon_size = int(bar_height * 1.0)
+        icon_y = int(y_pos + (bar_height - icon_size) / 2)
+
         if icon_img:
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
-            img.paste(icon_resized, (left_margin - icon_size - 15, int(y_pos - (icon_size - bar_height) / 2)), icon_resized)
+            img.paste(icon_resized, (flag_x, icon_y), icon_resized)
+        else:
+            # Fallback Circle with Initials if flag image fails to download
+            draw.ellipse([flag_x, icon_y, flag_x + icon_size, icon_y + icon_size], outline=color_rgb, width=2)
+            initials = cat_name[:2].upper()
+            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, fill=(255, 255, 255))
 
-        # Name Label
-        draw.text((30, y_pos + bar_height / 4), cat_name[:14], fill=(255, 255, 255))
-
-        # Bar
+        # 3. Bar
         if bar_w > 5:
             draw_rounded_rect(draw, [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height], corner_radius=8, fill=color_rgb)
 
-        # Value
+        # 4. Value Text
         val_str = f"{int(val):,}"
         draw.text((left_margin + bar_w + 12, y_pos + bar_height / 4), val_str, fill=color_rgb)
 
     return np.array(img.convert("RGB"))
 
 # ---------------------------------------------------------
-# VIDEO GENERATOR ENGINE
+# FAST VIDEO GENERATION ENGINE
 # ---------------------------------------------------------
-def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_race.mp4", fps=24, seconds_per_year=1.5):
+def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_race.mp4", fps=20, seconds_per_year=1.0):
+    loaded_flags = fetch_all_flags(df)
+
     years = sorted(df['Date'].unique())
     categories = df['Category'].unique()
 
@@ -171,8 +219,6 @@ def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_r
                 r0 = df0_map.loc[cat, 'Rank0'] if cat in df0_map.index else 15
                 r1 = df1_map.loc[cat, 'Rank1'] if cat in df1_map.index else 15
 
-                flag_val = df0_map.loc[cat, 'Flag'] if (cat in df0_map.index and 'Flag' in df0_map.columns) else None
-
                 v_interp = v0 + (v1 - v0) * t_eased
                 r_interp = r0 + (r1 - r0) * t_eased
 
@@ -181,8 +227,7 @@ def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_r
                     'YearLabel': year_interp,
                     'Category': cat,
                     'Value': v_interp,
-                    'Rank': r_interp,
-                    'Flag': flag_val
+                    'Rank': r_interp
                 })
 
     df_interp = pd.DataFrame(interp_records)
@@ -195,14 +240,23 @@ def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_r
         sub_df = df_interp[df_interp['Frame'] == frame_idx]
         year_lbl = sub_df['YearLabel'].iloc[0] if not sub_df.empty else years[0]
         
-        return render_cyberpunk_frame(sub_df, year_label=year_lbl, color_map=color_map, title=title, subtitle=subtitle)
+        return render_cyberpunk_frame(sub_df, year_label=year_lbl, color_map=color_map, loaded_flags=loaded_flags, title=title, subtitle=subtitle)
 
     duration = total_frames / fps
     clip = VideoClip(make_frame, duration=duration)
-    clip.write_videofile(output_path, fps=fps, codec='libx264', audio=False, preset='ultrafast')
+    
+    clip.write_videofile(
+        output_path,
+        fps=fps,
+        codec='libx264',
+        audio=False,
+        preset='ultrafast',
+        threads=4,
+        logger=None
+    )
 
 # ---------------------------------------------------------
-# STREAMLIT UI WITH SESSION STATE PERSISTENCE
+# STREAMLIT UI
 # ---------------------------------------------------------
 if __name__ == "__main__":
     st.set_page_config(page_title="Vertical Bar Chart Race", layout="wide")
@@ -249,18 +303,28 @@ if __name__ == "__main__":
                 color_map[entity] = st.color_picker(f"Color: {entity}", value=default_hex, key=f"cp_{entity}")
 
         if st.button("Generate Vertical Cyberpunk Video"):
-            with st.spinner("Generating vertical video... Please wait."):
-                output_path = "bar_chart_race.mp4"
-                generate_race_video(
-                    df,
-                    color_map=color_map,
-                    title=title_input,
-                    subtitle=subtitle_input,
-                    output_path=output_path
-                )
-                
-                with open(output_path, "rb") as vf:
-                    st.session_state['video_bytes'] = vf.read()
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            status_text.text("Pre-downloading flags & rendering frames...")
+            progress_bar.progress(30)
+            
+            output_path = "bar_chart_race.mp4"
+            generate_race_video(
+                df,
+                color_map=color_map,
+                title=title_input,
+                subtitle=subtitle_input,
+                output_path=output_path,
+                fps=20,
+                seconds_per_year=1.0
+            )
+            
+            progress_bar.progress(100)
+            status_text.text("Rendering complete!")
+
+            with open(output_path, "rb") as vf:
+                st.session_state['video_bytes'] = vf.read()
 
             st.success("Video generated successfully!")
 
