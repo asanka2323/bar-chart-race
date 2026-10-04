@@ -5,7 +5,7 @@ import requests
 import numpy as np
 import pandas as pd
 import streamlit as st
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from moviepy import VideoClip
 
 # ---------------------------------------------------------
@@ -25,7 +25,6 @@ COUNTRY_ISO_MAP = {
 def get_flag_url(category_name, given_flag_url=None):
     if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
         url_str = str(given_flag_url).strip()
-        # Automatically append width parameter if it's a Wikimedia SVG file
         if "wikimedia.org" in url_str and url_str.endswith(".svg") and "?width=" not in url_str:
             url_str += "?width=200"
         return url_str
@@ -85,8 +84,21 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# DRAWING UTILITIES
+# DRAWING & FONT UTILITIES
 # ---------------------------------------------------------
+def load_font(size, bold=False):
+    font_names = [
+        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
+        "Arial.ttf",
+        "LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf"
+    ]
+    for font_name in font_names:
+        try:
+            return ImageFont.truetype(font_name, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
 def ease_in_out_cubic(t):
     return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
 
@@ -111,32 +123,40 @@ def hex_to_rgb(hex_str):
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
 # ---------------------------------------------------------
-# FRAME RENDERER
+# FRAME RENDERER (LARGER FONTS & PERFECT ALIGNMENT)
 # ---------------------------------------------------------
 def render_cyberpunk_frame(df_frame, year_label, color_map, loaded_flags, title="BAR CHART RACE", subtitle="CYBERPUNK EDITION", width=720, height=1280):
     bg_color = (13, 17, 23)
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
+    # Pre-load custom fonts at larger sizes
+    font_title = load_font(24, bold=True)
+    font_subtitle = load_font(18, bold=True)
+    font_label = load_font(18, bold=True)
+    font_value = load_font(18, bold=True)
+    font_year = load_font(22, bold=True)
+
     top_margin = 180
     bottom_margin = 80
     
-    label_left = 30
-    flag_x = 210          # Flag centered in the 210-280 gap
-    left_margin = 280     # Bar starts at 280
-    right_margin = 120
+    # Layout spacing coordinates
+    label_right_align = 125  # End of country name label
+    flag_x = 135             # Flag icon start
+    left_margin = 200        # Animated bar start
+    right_margin = 110       # Right margin for numbers
     
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
     # Header Card
-    draw.rectangle([30, 50, width - 30, 140], outline=(0, 255, 153), width=2)
-    draw.text((50, 65), str(title).upper(), fill=(255, 255, 255))
-    draw.text((50, 95), str(subtitle).upper(), fill=(0, 255, 153))
+    draw.rectangle([20, 35, width - 20, 145], outline=(0, 255, 153), width=2)
+    draw.text((40, 50), str(title).upper(), font=font_title, fill=(255, 255, 255))
+    draw.text((40, 95), str(subtitle).upper(), font=font_subtitle, fill=(0, 255, 153))
 
     # Year Display Card
-    draw.rectangle([width - 240, 70, width - 50, 120], outline=(0, 255, 153), width=2)
-    draw.text((width - 220, 82), f"YEAR: {int(year_label)}", fill=(0, 255, 153))
+    draw.rectangle([width - 240, 55, width - 40, 125], outline=(0, 255, 153), width=2)
+    draw.text((width - 220, 75), f"YEAR: {int(year_label)}", font=font_year, fill=(0, 255, 153))
 
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
@@ -158,30 +178,39 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, loaded_flags, title=
         color_hex = color_map.get(cat_name, "#00FF99")
         color_rgb = hex_to_rgb(color_hex)
 
-        # 1. Text Label (Country Name)
-        draw.text((label_left, y_pos + bar_height / 4), cat_name[:14], fill=(255, 255, 255))
+        # 1. Text Label (Right-aligned with larger font size)
+        label_text = cat_name[:12]
+        bbox = draw.textbbox((0, 0), label_text, font=font_label)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        text_x = label_right_align - text_w
+        text_y = y_pos + (bar_height - text_h) / 2 - 2
+        draw.text((max(10, text_x), text_y), label_text, font=font_label, fill=(255, 255, 255))
 
         # 2. Flag Image Placement
         icon_img = loaded_flags.get(cat_name)
-        icon_size = int(bar_height * 1.0)
+        icon_size = int(bar_height * 0.95)
         icon_y = int(y_pos + (bar_height - icon_size) / 2)
 
         if icon_img:
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
             img.paste(icon_resized, (flag_x, icon_y), icon_resized)
         else:
-            # Fallback Circle with Initials if flag image fails to download
+            # Fallback Circle with Initials
             draw.ellipse([flag_x, icon_y, flag_x + icon_size, icon_y + icon_size], outline=color_rgb, width=2)
             initials = cat_name[:2].upper()
-            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, fill=(255, 255, 255))
+            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_label, fill=(255, 255, 255))
 
         # 3. Bar
         if bar_w > 5:
             draw_rounded_rect(draw, [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height], corner_radius=8, fill=color_rgb)
 
-        # 4. Value Text
+        # 4. Value Text (Larger font size)
         val_str = f"{int(val):,}"
-        draw.text((left_margin + bar_w + 12, y_pos + bar_height / 4), val_str, fill=color_rgb)
+        val_bbox = draw.textbbox((0, 0), val_str, font=font_value)
+        val_h = val_bbox[3] - val_bbox[1]
+        val_y = y_pos + (bar_height - val_h) / 2 - 2
+        draw.text((left_margin + bar_w + 10, val_y), val_str, font=font_value, fill=color_rgb)
 
     return np.array(img.convert("RGB"))
 
