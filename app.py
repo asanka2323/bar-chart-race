@@ -306,10 +306,18 @@ def generate_race_video(df, output_path="bar_chart_race.mp4", fps=30, seconds_pe
     print(f"\nHD Video successfully saved to {output_path}!")
 
 if __name__ == "__main__":
-    df = pd.read_csv(CSV_PATH)
-    generate_race_video(df, output_path="bar_chart_race.mp4", default_style="cyber_pulse")
+    st.title("Cyberpunk Bar Chart Race")
 
-    # Display generated video in Streamlit
-    with open("bar_chart_race.mp4", "rb") as video_file:
-        video_bytes = video_file.read()
-    st.video(video_bytes)
+    # Upload button right on the webpage interface
+    uploaded_file = st.file_uploader("Upload your dataset (CSV)", type=["csv"])
+
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        
+        if st.button("Generate Video"):
+            with st.spinner("Generating video... Please wait."):
+                generate_race_video(df, output_path="bar_chart_race.mp4", default_style="cyber_pulse")
+            
+            with open("bar_chart_race.mp4", "rb") as video_file:
+                video_bytes = video_file.read()
+            st.video(video_bytes, use_container_width=True)
