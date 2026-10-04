@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import requests
 import io
@@ -6,7 +7,7 @@ import math
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
-from moviepy.video.VideoClip import VideoClip
+from moviepy import VideoClip
 
 # ---------------------------------------------------------
 # 1. EASING & ANIMATION STYLES ENGINE
