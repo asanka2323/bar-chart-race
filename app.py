@@ -202,6 +202,6 @@ if __name__ == "__main__":
 
             with open("bar_chart_race.mp4", "rb") as video_file:
                 video_bytes = video_file.read()
-            st.video(video_bytes, use_container_width=True)
+            st.video(video_bytes)
     else:
         st.info("Please upload a CSV file to generate the video.")
