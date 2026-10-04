@@ -27,14 +27,13 @@ def get_image(url_or_path):
     
     try:
         if url_str.startswith("http://") or url_str.startswith("https://"):
-            response = requests.get(url_str, timeout=5)
+            response = requests.get(url_str, timeout=3)
             img = Image.open(io.BytesIO(response.content)).convert("RGBA")
         elif os.path.exists(url_str):
             img = Image.open(url_str).convert("RGBA")
         else:
             return None
         
-        # Crop/Resize to square
         w, h = img.size
         min_dim = min(w, h)
         img_cropped = img.crop(((w - min_dim) // 2, (h - min_dim) // 2, (w + min_dim) // 2, (h + min_dim) // 2))
@@ -44,12 +43,12 @@ def get_image(url_or_path):
         return None
 
 # ---------------------------------------------------------
-# EASING FUNCTIONS
+# EASING & DRAWING UTILITIES
 # ---------------------------------------------------------
 def ease_in_out_cubic(t):
     return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
 
-def draw_rounded_rect(draw, xy, corner_radius, fill=None, outline=None, width=1):
+def draw_rounded_rect(draw, xy, corner_radius, fill=None):
     x1, y1, x2, y2 = xy
     if x2 - x1 < corner_radius * 2:
         corner_radius = max(1, (x2 - x1) / 2)
@@ -60,7 +59,6 @@ def draw_rounded_rect(draw, xy, corner_radius, fill=None, outline=None, width=1)
     draw.pieslice([x1, y2 - 2 * corner_radius, x1 + 2 * corner_radius, y2], 90, 180, fill=fill)
     draw.pieslice([x2 - 2 * corner_radius, y2 - 2 * corner_radius, x2, y2], 0, 90, fill=fill)
 
-# Default Cyberpunk Palette
 DEFAULT_PALETTE = [
     "#00FF99", "#BA55D3", "#00BFFF", "#FFBF00", "#FF0080",
     "#7FFF00", "#FF4500", "#00EEEE", "#FFD700", "#FF1493"
@@ -71,29 +69,29 @@ def hex_to_rgb(hex_str):
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
 # ---------------------------------------------------------
-# VERTICAL FRAME RENDERER (1080 x 1920)
+# VERTICAL FRAME RENDERER (720 x 1280 - FAST & MEMORY EFFICIENT)
 # ---------------------------------------------------------
-def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RACE", subtitle="CYBERPUNK EDITION", width=1080, height=1920):
+def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RACE", subtitle="CYBERPUNK EDITION", width=720, height=1280):
     bg_color = (13, 17, 23)
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    top_margin = 280
-    bottom_margin = 120
-    left_margin = 320
-    right_margin = 180
+    top_margin = 180
+    bottom_margin = 80
+    left_margin = 210
+    right_margin = 120
     
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
-    # Top Banner Header
-    draw.rectangle([60, 80, width - 60, 200], outline=(0, 255, 153), width=3)
-    draw.text((90, 100), str(title).upper(), fill=(255, 255, 255))
-    draw.text((90, 140), str(subtitle).upper(), fill=(0, 255, 153))
+    # Header Card
+    draw.rectangle([30, 50, width - 30, 140], outline=(0, 255, 153), width=2)
+    draw.text((50, 65), str(title).upper(), fill=(255, 255, 255))
+    draw.text((50, 95), str(subtitle).upper(), fill=(0, 255, 153))
 
-    # Large Year Watermark / Card
-    draw.rectangle([width - 380, 110, width - 90, 170], outline=(0, 255, 153), width=2)
-    draw.text((width - 360, 125), f"YEAR: {int(year_label)}", fill=(0, 255, 153))
+    # Year Display Card
+    draw.rectangle([width - 240, 70, width - 50, 120], outline=(0, 255, 153), width=2)
+    draw.text((width - 220, 82), f"YEAR: {int(year_label)}", fill=(0, 255, 153))
 
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
@@ -107,7 +105,6 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RAC
         rank = row['Rank']
         flag_url = row.get('Flag', None)
 
-        # Skip bars that drift out of top 10 bounds
         if rank > top_n + 0.5:
             continue
 
@@ -117,34 +114,34 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, title="BAR CHART RAC
         color_hex = color_map.get(cat_name, "#00FF99")
         color_rgb = hex_to_rgb(color_hex)
 
-        # 1. Render Icon / Flag / Logo Image
+        # Flag / Icon
         icon_img = get_image(flag_url)
         icon_size = int(bar_height * 1.1)
         if icon_img:
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
-            img.paste(icon_resized, (left_margin - icon_size - 20, int(y_pos - (icon_size - bar_height) / 2)), icon_resized)
+            img.paste(icon_resized, (left_margin - icon_size - 15, int(y_pos - (icon_size - bar_height) / 2)), icon_resized)
 
-        # 2. Render Text Label (Entity Name)
-        draw.text((60, y_pos + bar_height / 4), cat_name[:16], fill=(255, 255, 255))
+        # Name Label
+        draw.text((30, y_pos + bar_height / 4), cat_name[:14], fill=(255, 255, 255))
 
-        # 3. Render Rounded Horizontal Bar
-        if bar_w > 10:
-            draw_rounded_rect(draw, [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height], corner_radius=12, fill=color_rgb)
+        # Bar
+        if bar_w > 5:
+            draw_rounded_rect(draw, [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height], corner_radius=8, fill=color_rgb)
 
-        # 4. Render Metric Value
+        # Value
         val_str = f"{int(val):,}"
-        draw.text((left_margin + bar_w + 20, y_pos + bar_height / 4), val_str, fill=color_rgb)
+        draw.text((left_margin + bar_w + 12, y_pos + bar_height / 4), val_str, fill=color_rgb)
 
     return np.array(img.convert("RGB"))
 
 # ---------------------------------------------------------
-# VIDEO GENERATION ENGINE WITH SMOOTH SHIFTING
+# VIDEO GENERATOR ENGINE
 # ---------------------------------------------------------
-def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_race.mp4", fps=30, seconds_per_year=2):
+def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_race.mp4", fps=24, seconds_per_year=1.5):
     years = sorted(df['Date'].unique())
     categories = df['Category'].unique()
 
-    frames_per_year = fps * seconds_per_year
+    frames_per_year = int(fps * seconds_per_year)
     total_frames = (len(years) - 1) * frames_per_year
 
     interp_records = []
@@ -202,42 +199,45 @@ def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_r
 
     duration = total_frames / fps
     clip = VideoClip(make_frame, duration=duration)
-    clip.write_videofile(output_path, fps=fps, codec='libx264', audio=False)
+    clip.write_videofile(output_path, fps=fps, codec='libx264', audio=False, preset='ultrafast')
 
 # ---------------------------------------------------------
-# STREAMLIT USER INTERFACE
+# STREAMLIT UI WITH SESSION STATE PERSISTENCE
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    st.set_page_config(page_title="Cyberpunk Bar Chart Race", layout="wide")
+    st.set_page_config(page_title="Vertical Bar Chart Race", layout="wide")
     st.title("Vertical Cyberpunk Bar Chart Race Generator")
 
     uploaded_file = st.file_uploader("Upload Dataset (CSV)", type=["csv"])
 
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
+        if 'df' not in st.session_state or st.session_state.get('uploaded_filename') != uploaded_file.name:
+            df = pd.read_csv(uploaded_file)
 
-        # Auto-reshape Wide Datasets (Country, Flag, 1990, 1991...) to Long Format
-        if 'Date' not in df.columns or 'Category' not in df.columns or 'Value' not in df.columns:
-            id_vars = [col for col in df.columns if not str(col).isdigit()]
-            value_vars = [col for col in df.columns if str(col).isdigit()]
+            if 'Date' not in df.columns or 'Category' not in df.columns or 'Value' not in df.columns:
+                id_vars = [col for col in df.columns if not str(col).isdigit()]
+                value_vars = [col for col in df.columns if str(col).isdigit()]
 
-            cat_col = 'Country' if 'Country' in id_vars else (id_vars[0] if id_vars else df.columns[0])
+                cat_col = 'Country' if 'Country' in id_vars else (id_vars[0] if id_vars else df.columns[0])
 
-            df = df.melt(id_vars=id_vars, value_vars=value_vars, var_name='Date', value_name='Value')
-            df = df.rename(columns={cat_col: 'Category'})
-            df['Date'] = pd.to_numeric(df['Date'], errors='coerce')
-            df['Value'] = pd.to_numeric(df['Value'], errors='coerce').fillna(0)
+                df = df.melt(id_vars=id_vars, value_vars=value_vars, var_name='Date', value_name='Value')
+                df = df.rename(columns={cat_col: 'Category'})
+                df['Date'] = pd.to_numeric(df['Date'], errors='coerce')
+                df['Value'] = pd.to_numeric(df['Value'], errors='coerce').fillna(0)
+
+            st.session_state['df'] = df
+            st.session_state['uploaded_filename'] = uploaded_file.name
+        else:
+            df = st.session_state['df']
 
         st.write("### Dataset Preview", df.head())
 
-        # Header Titles Customization
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             title_input = st.text_input("Main Title", value="WORLD CAR MANUFACTURING")
         with col_t2:
             subtitle_input = st.text_input("Subtitle", value="TOP PRODUCERS • CYBERPUNK EDITION")
 
-        # Dynamic Entity Color Customization
         st.write("### Custom Entity Colors")
         unique_entities = sorted(df['Category'].unique())
         color_map = {}
@@ -246,22 +246,25 @@ if __name__ == "__main__":
         for idx, entity in enumerate(unique_entities):
             default_hex = DEFAULT_PALETTE[idx % len(DEFAULT_PALETTE)]
             with cols[idx % 4]:
-                color_map[entity] = st.color_picker(f"Color: {entity}", value=default_hex)
+                color_map[entity] = st.color_picker(f"Color: {entity}", value=default_hex, key=f"cp_{entity}")
 
         if st.button("Generate Vertical Cyberpunk Video"):
-            with st.spinner("Rendering vertical video with smooth rank shifting and icons..."):
+            with st.spinner("Generating vertical video... Please wait."):
+                output_path = "bar_chart_race.mp4"
                 generate_race_video(
                     df,
                     color_map=color_map,
                     title=title_input,
                     subtitle=subtitle_input,
-                    output_path="bar_chart_race.mp4"
+                    output_path=output_path
                 )
+                
+                with open(output_path, "rb") as vf:
+                    st.session_state['video_bytes'] = vf.read()
 
             st.success("Video generated successfully!")
 
-            with open("bar_chart_race.mp4", "rb") as video_file:
-                video_bytes = video_file.read()
-            st.video(video_bytes)
+        if 'video_bytes' in st.session_state:
+            st.video(st.session_state['video_bytes'])
     else:
-        st.info("Upload a CSV file to customize colors, titles, and render your vertical bar chart race video.")
+        st.info("Upload a CSV file to customize colors, titles, and render your video.")
