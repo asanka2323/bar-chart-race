@@ -1,4 +1,4 @@
-import os
+import streamlit as st
 import requests
 import io
 import cv2
@@ -307,7 +307,8 @@ def generate_race_video(df, output_path="bar_chart_race.mp4", fps=30, seconds_pe
 if __name__ == "__main__":
     df = pd.read_csv(CSV_PATH)
     generate_race_video(df, output_path="bar_chart_race.mp4", default_style="cyber_pulse")
-# Display generated video
-video_file = open("bar_chart_race.mp4", "rb")
-video_bytes = video_file.read()
-st.video(video_bytes)
+
+    # Display generated video in Streamlit
+    with open("bar_chart_race.mp4", "rb") as video_file:
+        video_bytes = video_file.read()
+    st.video(video_bytes)
