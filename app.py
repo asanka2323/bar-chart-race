@@ -9,40 +9,36 @@ from PIL import Image, ImageDraw, ImageFont
 from moviepy import VideoClip
 
 # ---------------------------------------------------------
-# BRAND BOOK V1.0 COLOR PALETTE & CONFIGURATION
+# THEME & COLOR PALETTE
 # ---------------------------------------------------------
 THEMES = {
     "Light Mode (Default)": {
-        "bg_color": (248, 249, 250),       # #F8F9FA Off-white
-        "title_color": (17, 24, 39),       # #111827
-        "subtitle_color": (31, 41, 55),    # #1F2937 Dark Slate
-        "grid_color": (209, 213, 219, 150),# #D1D5DB Grid
-        "label_color": (17, 24, 39),      # #111827
-        "value_color": (17, 24, 39),      # #111827
-        "year_color": (30, 58, 138),       # #1E3A8A Dark Navy
-        "bar_primary": "#1E3A8A",          # StatRise Blue
-        "bar_lead": "#111827",             # StatRise Black for #1 rank
-        "show_flag_accent": True,
+        "bg_color": (245, 244, 238),       # #F5F4EE Warm Poster Background
+        "title_color": (18, 30, 66),       # #121E42 Deep Navy Title
+        "subtitle_color": (18, 30, 66),    # #121E42 Deep Navy Subtitle
+        "grid_color": (218, 216, 206),     # Grid lines
+        "label_color": (18, 30, 66),      # Dark text for country names
+        "value_color": (18, 30, 66),      # Dark text for numbers
+        "year_color": (18, 30, 66),       # Deep Navy Year Number
+        "bar_primary": "#121E42",
         "bar_stroke": False
     },
     "Dark Mode (Shorts)": {
         "bg_color": (15, 23, 42),         # #0F172A Deep Navy
-        "title_color": (249, 250, 251),    # #F9FAFB
-        "subtitle_color": (209, 213, 219), # #D1D5DB
-        "grid_color": (30, 41, 59, 180),   # #1E293B
-        "label_color": (249, 250, 251),   # #F9FAFB
-        "value_color": (249, 250, 251),   # #F9FAFB
-        "year_color": (249, 250, 251),    # White / Light Gray
-        "bar_primary": "#1E3A8A",          # StatRise Blue
-        "bar_lead": "#111827",             # StatRise Black
-        "show_flag_accent": False,
+        "title_color": (249, 250, 251),    # White Title
+        "subtitle_color": (209, 213, 219), # Gray Subtitle
+        "grid_color": (30, 41, 59),       # Grid lines
+        "label_color": (249, 250, 251),   # White Country Names
+        "value_color": (249, 250, 251),   # White Values
+        "year_color": (249, 250, 251),    # White Year
+        "bar_primary": "#1E3A8A",
         "bar_stroke": True
     }
 }
 
 DEFAULT_ACCENT_COLORS = [
-    "#1E3A8A", "#111827", "#15803D", "#B91C1C", "#D97706",
-    "#7C3AED", "#2563EB", "#059669", "#4F46E5", "#9333EA"
+    "#121E42", "#2B4C7E", "#0A6640", "#B22222", "#004B87",
+    "#D85A27", "#1E3A8A", "#059669", "#7C3AED", "#9333EA"
 ]
 
 COUNTRY_ISO_MAP = {
@@ -54,7 +50,7 @@ COUNTRY_ISO_MAP = {
 }
 
 # ---------------------------------------------------------
-# FONT HELPER (Montserrat & Inter System)
+# FONT HELPER
 # ---------------------------------------------------------
 def load_brand_font(family="Montserrat", variant="Bold", size=20):
     font_files = [
@@ -140,26 +136,26 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER
+# FRAME RENDERER (EXACT POSTER LOOK)
 # ---------------------------------------------------------
 def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, title="STATE GDP\nGROWTH", subtitle="MEASURED IN CURRENT MILLIONS", width=720, height=1280):
     bg_color = theme_config["bg_color"]
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # Fonts
-    font_main_title = load_brand_font("Montserrat", "ExtraBold", 46)
-    font_subtitle = load_brand_font("Montserrat", "ExtraBold", 20)
-    font_big_year = load_brand_font("Montserrat", "ExtraBold", 110)
-    font_label = load_brand_font("Inter", "Medium", 18)
-    font_value = load_brand_font("Montserrat", "Bold", 20)
+    # Large Fonts matching poster layout
+    font_main_title = load_brand_font("Montserrat", "ExtraBold", 62)
+    font_subtitle = load_brand_font("Montserrat", "Bold", 28)
+    font_big_year = load_brand_font("Montserrat", "ExtraBold", 140)
+    font_label = load_brand_font("Inter", "Bold", 22)
+    font_value = load_brand_font("Montserrat", "Bold", 22)
 
-    top_margin = 230
-    bottom_margin = 120
-    label_right_align = 125
-    flag_x = 135
-    left_margin = 190
-    right_margin = 110
+    top_margin = 290
+    bottom_margin = 150
+    label_right_align = 145
+    flag_x = 155
+    left_margin = 220
+    right_margin = 100
 
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
@@ -168,18 +164,18 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     grid_color = theme_config["grid_color"]
     for i in range(5):
         gx = left_margin + (chart_width / 4) * i
-        draw.line([(gx, top_margin - 10), (gx, height - bottom_margin)], fill=grid_color[:3], width=1)
+        draw.line([(gx, top_margin - 10), (gx, height - bottom_margin)], fill=grid_color, width=2)
 
-    # 2. Main Title (Top Left, Multiline)
+    # 2. Main Title (Big, ExtraBold Upper Left)
     title_lines = str(title).strip().upper().split('\n')
-    y_title_offset = 35
+    y_title_offset = 40
     for line in title_lines:
-        draw.text((35, y_title_offset), line, font=font_main_title, fill=theme_config["title_color"])
+        draw.text((40, y_title_offset), line, font=font_main_title, fill=theme_config["title_color"])
         bbox = draw.textbbox((0, 0), line, font=font_main_title)
-        y_title_offset += (bbox[3] - bbox[1]) + 5
+        y_title_offset += (bbox[3] - bbox[1]) + 6
 
-    # 3. Subtitle (Below Main Title)
-    draw.text((35, y_title_offset + 5), str(subtitle).strip().upper(), font=font_subtitle, fill=theme_config["subtitle_color"])
+    # 3. Subtitle (Directly below Title)
+    draw.text((40, y_title_offset + 10), str(subtitle).strip().upper(), font=font_subtitle, fill=theme_config["subtitle_color"])
 
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
@@ -208,7 +204,7 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         text_h = bbox[3] - bbox[1]
         draw.text((max(10, label_right_align - text_w), y_pos + (bar_height - text_h) / 2 - 2), label_text, font=font_label, fill=theme_config["label_color"])
 
-        # Flag / Circle Icon
+        # Flag Icon
         icon_img = loaded_flags.get(cat_name)
         icon_size = int(bar_height * 0.95)
         icon_y = int(y_pos + (bar_height - icon_size) / 2)
@@ -221,26 +217,26 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
             initials = cat_name[:2].upper()
             draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_label, fill=(255, 255, 255))
 
-        # Bar Rectangle
+        # Bar
         if bar_w > 5:
             bar_rect = [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height]
-            draw.rounded_rectangle(bar_rect, radius=3, fill=color_rgb)
+            draw.rounded_rectangle(bar_rect, radius=4, fill=color_rgb)
             if theme_config["bar_stroke"]:
-                draw.rounded_rectangle(bar_rect, radius=3, outline=(255, 255, 255), width=2)
+                draw.rounded_rectangle(bar_rect, radius=4, outline=(255, 255, 255), width=2)
 
-        # Value Label
+        # Value Text
         val_str = f"{int(val):,}"
         val_bbox = draw.textbbox((0, 0), val_str, font=font_value)
         val_h = val_bbox[3] - val_bbox[1]
         draw.text((left_margin + bar_w + 10, y_pos + (bar_height - val_h) / 2 - 2), val_str, font=font_value, fill=theme_config["value_color"])
 
-    # 4. Big Bold Year Counter (Bottom Right)
+    # 4. Big Bold Bottom-Right Year Display
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
     year_h = bbox_year[3] - bbox_year[1]
     
-    draw.text((width - year_w - 45, height - year_h - 70), year_str, font=font_big_year, fill=theme_config["year_color"])
+    draw.text((width - year_w - 40, height - year_h - 60), year_str, font=font_big_year, fill=theme_config["year_color"])
 
     return np.array(img.convert("RGB"))
 
@@ -331,7 +327,6 @@ if __name__ == "__main__":
         st.header("Display Theme")
         theme_choice = st.radio("Select Theme Mode", list(THEMES.keys()), index=0)
 
-    # Title & Subtitle inputs placed prominently before uploading
     st.write("### 1. Video Customization")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
@@ -378,7 +373,7 @@ if __name__ == "__main__":
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            status_text.text("Fetching assets and rendering video frames...")
+            status_text.text("Rendering video frames...")
             progress_bar.progress(30)
             
             output_path = "statrise_race.mp4"
