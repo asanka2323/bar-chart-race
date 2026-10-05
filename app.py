@@ -50,35 +50,29 @@ COUNTRY_ISO_MAP = {
 }
 
 # ---------------------------------------------------------
-# RELIABLE FONT LOADER (Downloads TrueType Fonts Automatically)
+# FAILSAFE TRUETYPE FONT DOWNLOADER
 # ---------------------------------------------------------
-FONT_URLS = {
-    "bold": "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-ExtraBold.ttf",
-    "regular": "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-Bold.ttf",
-    "sans": "https://github.com/google/fonts/raw/main/ofl/inter/static/Inter-Bold.ttf"
-}
-
 @st.cache_resource
-def get_scalable_font(font_type="bold", size=50):
+def get_bold_font(size):
     os.makedirs("fonts", exist_ok=True)
-    file_path = f"fonts/{font_type}.ttf"
+    font_path = "fonts/Montserrat-ExtraBold.ttf"
     
-    if not os.path.exists(file_path):
+    if not os.path.exists(font_path):
+        url = "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-ExtraBold.ttf"
         try:
-            res = requests.get(FONT_URLS.get(font_type, FONT_URLS["bold"]), timeout=10)
+            res = requests.get(url, timeout=10)
             if res.status_code == 200:
-                with open(file_path, "wb") as f:
+                with open(font_path, "wb") as f:
                     f.write(res.content)
         except Exception:
             pass
 
-    if os.path.exists(file_path):
+    if os.path.exists(font_path):
         try:
-            return ImageFont.truetype(file_path, size)
+            return ImageFont.truetype(font_path, size)
         except Exception:
             pass
             
-    # Universal Linux fallback font
     for fallback in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"]:
         if os.path.exists(fallback):
             try:
@@ -158,50 +152,52 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER (GIANT FONT SIZES)
+# FRAME RENDERER
 # ---------------------------------------------------------
-def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, title="CAR MANUFACTURING", subtitle="AMERICA VS THE WORLD", width=1080, height=1920):
+def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, 
+                       title="CAR MANUFACTURING\nAMERICA VS THE WORLD", 
+                       subtitle="MEASURED IN UNITS", width=1080, height=1920):
+    
     bg_color = theme_config["bg_color"]
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # DYNAMIC MASSIVE SCALED FONTS
-    font_main_title = get_scalable_font("bold", 110)
-    font_subtitle   = get_scalable_font("regular", 55)
-    font_big_year   = get_scalable_font("bold", 220)
-    font_label      = get_scalable_font("sans", 36)
-    font_value      = get_scalable_font("bold", 36)
+    # 1. LOAD GIANT TRUETYPE FONTS
+    font_main_title = get_bold_font(90)
+    font_subtitle   = get_bold_font(45)
+    font_big_year   = get_bold_font(180)
+    font_label      = get_bold_font(32)
+    font_value      = get_bold_font(32)
 
-    top_margin = 450
+    NAVY_COLOR = (18, 30, 66, 255) # Hardcoded Deep Navy (#121E42)
+
+    # 2. RENDER HUGE TITLE AT TOP LEFT
+    title_lines = str(title).strip().upper().split('\n')
+    y_offset = 80
+    for line in title_lines:
+        draw.text((60, y_offset), line, font=font_main_title, fill=NAVY_COLOR)
+        bbox = draw.textbbox((0, 0), line, font=font_main_title)
+        y_offset += (bbox[3] - bbox[1]) + 20
+
+    # 3. RENDER SUBTITLE DIRECTLY BELOW
+    draw.text((60, y_offset + 10), str(subtitle).strip().upper(), font=font_subtitle, fill=NAVY_COLOR)
+
+    # 4. CHART MARGINS
+    top_margin = y_offset + 120
     bottom_margin = 250
-    label_right_align = 220
-    flag_x = 240
-    left_margin = 350
+    left_margin = 320
     right_margin = 150
-
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
-    # 1. Background Grid Lines
-    grid_color = theme_config["grid_color"]
+    # Background Grid Lines
     for i in range(5):
         gx = left_margin + (chart_width / 4) * i
-        draw.line([(gx, top_margin - 20), (gx, height - bottom_margin)], fill=grid_color, width=3)
+        draw.line([(gx, top_margin), (gx, height - bottom_margin)], fill=(218, 216, 206), width=3)
 
-    # 2. Main Title (MASSIVE ExtraBold Upper Left)
-    title_lines = str(title).strip().upper().split('\n')
-    y_title_offset = 70
-    for line in title_lines:
-        draw.text((60, y_title_offset), line, font=font_main_title, fill=theme_config["title_color"])
-        bbox = draw.textbbox((0, 0), line, font=font_main_title)
-        y_title_offset += (bbox[3] - bbox[1]) + 15
-
-    # 3. Subtitle (Directly below Title)
-    draw.text((60, y_title_offset + 15), str(subtitle).strip().upper(), font=font_subtitle, fill=theme_config["subtitle_color"])
-
+    # 5. BARS & ENTITY LABELS
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
-
     bar_height = (chart_height / top_n) * 0.58
     bar_gap = (chart_height / top_n) * 0.42
 
@@ -216,49 +212,36 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         y_pos = top_margin + rank * (bar_height + bar_gap)
         bar_w = (val / max_val) * chart_width if max_val > 0 else 0
 
-        color_hex = color_map.get(cat_name, theme_config["bar_primary"])
+        color_hex = color_map.get(cat_name, "#121E42")
         color_rgb = hex_to_rgb(color_hex)
 
-        # Entity Label
-        label_text = cat_name[:14]
-        bbox = draw.textbbox((0, 0), label_text, font=font_label)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
-        draw.text((max(20, label_right_align - text_w), y_pos + (bar_height - text_h) / 2 - 2), label_text, font=font_label, fill=theme_config["label_color"])
+        # Label
+        label_text = cat_name[:12]
+        draw.text((40, y_pos + 10), label_text, font=font_label, fill=NAVY_COLOR)
 
-        # Flag Icon
+        # Flag
         icon_img = loaded_flags.get(cat_name)
-        icon_size = int(bar_height * 0.95)
-        icon_y = int(y_pos + (bar_height - icon_size) / 2)
-
+        icon_size = int(bar_height * 0.9)
         if icon_img:
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
-            img.paste(icon_resized, (flag_x, icon_y), icon_resized)
-        else:
-            draw.ellipse([flag_x, icon_y, flag_x + icon_size, icon_y + icon_size], fill=color_rgb)
-            initials = cat_name[:2].upper()
-            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_label, fill=(255, 255, 255))
+            img.paste(icon_resized, (220, int(y_pos)), icon_resized)
 
         # Bar
         if bar_w > 5:
             bar_rect = [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height]
             draw.rounded_rectangle(bar_rect, radius=6, fill=color_rgb)
-            if theme_config["bar_stroke"]:
-                draw.rounded_rectangle(bar_rect, radius=6, outline=(255, 255, 255), width=3)
 
-        # Value Text
+        # Value
         val_str = f"{int(val):,}"
-        val_bbox = draw.textbbox((0, 0), val_str, font=font_value)
-        val_h = val_bbox[3] - val_bbox[1]
-        draw.text((left_margin + bar_w + 15, y_pos + (bar_height - val_h) / 2 - 2), val_str, font=font_value, fill=theme_config["value_color"])
+        draw.text((left_margin + bar_w + 15, y_pos + 10), val_str, font=font_value, fill=NAVY_COLOR)
 
-    # 4. HUGE Bottom-Right Year Display
+    # 6. HUGE YEAR DISPLAY (BOTTOM RIGHT)
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
     year_h = bbox_year[3] - bbox_year[1]
     
-    draw.text((width - year_w - 60, height - year_h - 80), year_str, font=font_big_year, fill=theme_config["year_color"])
+    draw.text((width - year_w - 60, height - year_h - 80), year_str, font=font_big_year, fill=NAVY_COLOR)
 
     return np.array(img.convert("RGB"))
 
@@ -352,9 +335,9 @@ if __name__ == "__main__":
     st.write("### 1. Video Customization")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="CAR MANUFACTURING", height=90)
+        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="CAR MANUFACTURING\nAMERICA VS THE WORLD", height=90)
     with col_t2:
-        subtitle_input = st.text_input("Subtitle / Unit Measurement", value="AMERICA VS THE WORLD")
+        subtitle_input = st.text_input("Subtitle / Unit Measurement", value="MEASURED IN UNITS")
 
     st.write("### 2. Dataset Upload")
     uploaded_file = st.file_uploader("Upload CSV Dataset", type=["csv"])
