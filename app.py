@@ -17,7 +17,7 @@ THEMES = {
         "title_color": (18, 30, 66),       # Deep Navy Title
         "subtitle_color": (18, 30, 66),    # Deep Navy Subtitle
         "grid_color": (218, 216, 206),     # Grid lines
-        "label_color": (18, 30, 66),      # Dark text for country names
+        "label_color": (18, 30, 66),      # Dark text for names
         "value_color": (18, 30, 66),      # Dark text for numbers
         "year_color": (18, 30, 66),       # Deep Navy Year Number
         "bar_primary": "#121E42",
@@ -50,11 +50,10 @@ COUNTRY_ISO_MAP = {
 }
 
 # ---------------------------------------------------------
-# STEP 2: LINUX SYSTEM FONT LOADER (PACKAGES.TXT DRIVEN)
+# SYSTEM FONT LOADER
 # ---------------------------------------------------------
 @st.cache_resource
 def load_system_font(size):
-    # Linux system font paths installed via packages.txt
     system_fonts = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -68,13 +67,11 @@ def load_system_font(size):
             except Exception:
                 continue
 
-    # Windows fallback for local testing
     try:
         return ImageFont.truetype("arialbd.ttf", size)
     except Exception:
         pass
 
-    # Fallback if no TTF font is found
     return ImageFont.load_default()
 
 def hex_to_rgb(hex_str):
@@ -85,29 +82,43 @@ def ease_in_out_cubic(t):
     return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
 
 # ---------------------------------------------------------
-# FLAG & ICON HELPERS
+# UNIVERSAL LOGO & FLAG AUTO-DETECTOR
 # ---------------------------------------------------------
-def get_flag_url(category_name, given_flag_url=None):
-    if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
-        url_str = str(given_flag_url).strip()
+def get_universal_image_url(category_name, given_url=None):
+    # Tier 1: Direct URL provided in CSV
+    if given_url and pd.notna(given_url) and str(given_url).strip().startswith(("http://", "https://")):
+        url_str = str(given_url).strip()
         if "wikimedia.org" in url_str and url_str.endswith(".svg") and "?width=" not in url_str:
             url_str += "?width=200"
         return url_str
 
     clean_name = str(category_name).strip().lower()
+
+    # Tier 2: Check Country ISO Flag Database
     iso = COUNTRY_ISO_MAP.get(clean_name)
     if iso and not iso.startswith("us-"):
         return f"https://flagcdn.com/w160/{iso}.png"
-    return None
+
+    # Tier 3: Brand Logo via Clearbit API
+    clean_domain = clean_name.replace(" ", "").replace("'", "").replace("&", "")
+    return f"https://logo.clearbit.com/{clean_domain}.com"
+
 
 def load_circular_image(url_or_path):
     if not url_or_path or pd.isna(url_or_path) or str(url_or_path).strip() == "":
         return None
     url_str = str(url_or_path).strip()
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         if url_str.startswith("http://") or url_str.startswith("https://"):
-            res = requests.get(url_str, headers=headers, timeout=5)
+            res = requests.get(url_str, headers=headers, timeout=4)
+            
+            # Tier 4 Fallback: If Clearbit returns non-200, use Google Favicon API
+            if res.status_code != 200 and "clearbit.com" in url_str:
+                domain = url_str.split("/")[-1].replace(".com", "")
+                google_url = f"https://www.google.com/s2/favicons?domain={domain}.com&sz=128"
+                res = requests.get(google_url, headers=headers, timeout=4)
+
             if res.status_code == 200:
                 img = Image.open(io.BytesIO(res.content)).convert("RGBA")
             else:
@@ -117,6 +128,7 @@ def load_circular_image(url_or_path):
         else:
             return None
         
+        # Crop square and mask into circle
         w, h = img.size
         min_dim = min(w, h)
         img_cropped = img.crop(((w - min_dim) // 2, (h - min_dim) // 2, (w + min_dim) // 2, (h + min_dim) // 2))
@@ -131,23 +143,34 @@ def load_circular_image(url_or_path):
     except Exception:
         return None
 
+
 def fetch_all_flags(df):
     flag_dict = {}
+    
+    possible_url_cols = ['logo', 'flag', 'image', 'icon', 'url', 'photo', 'avatar']
+    matched_col = None
+    for col in df.columns:
+        if str(col).strip().lower() in possible_url_cols:
+            matched_col = col
+            break
+
     for cat in df['Category'].unique():
-        given_flag = None
-        if 'Flag' in df.columns:
+        given_url = None
+        if matched_col and matched_col in df.columns:
             sub = df[df['Category'] == cat]
             if not sub.empty:
-                given_flag = sub['Flag'].iloc[0]
-        url = get_flag_url(cat, given_flag)
-        if url:
-            img = load_circular_image(url)
+                given_url = sub[matched_col].iloc[0]
+
+        image_url = get_universal_image_url(cat, given_url)
+        if image_url:
+            img = load_circular_image(image_url)
             if img:
                 flag_dict[cat] = img
+
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER (UPDATED FONT SIZES)
+# FRAME RENDERER
 # ---------------------------------------------------------
 def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, 
                        title="I WANT THIS BIG\nTHIS ALSO IN BIG", 
@@ -157,12 +180,12 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # 1. LOAD SYSTEM FONTS WITH CUSTOM SIZES
-    font_main_title = load_system_font(100) # Updated: 100px
-    font_subtitle   = load_system_font(40)  # Updated: 40px
-    font_big_year   = load_system_font(120) # Updated: 120px
-    font_label      = load_system_font(20)  # Updated: 20px
-    font_value      = load_system_font(20)  # Updated: 20px
+    # 1. LOAD SYSTEM FONTS
+    font_main_title = load_system_font(100) # Title: 100px
+    font_subtitle   = load_system_font(40)  # Subtitle: 40px
+    font_big_year   = load_system_font(120) # Year: 120px
+    font_label      = load_system_font(20)  # Category Label: 20px
+    font_value      = load_system_font(20)  # Value: 20px
 
     NAVY_COLOR = (18, 30, 66, 255)
 
@@ -213,7 +236,7 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         label_text = cat_name[:14]
         draw.text((60, y_pos + 12), label_text, font=font_label, fill=NAVY_COLOR)
 
-        # Flag Icon
+        # Flag / Logo Icon
         icon_img = loaded_flags.get(cat_name)
         icon_size = int(bar_height * 0.95)
         if icon_img:
@@ -229,16 +252,13 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         val_str = f"{int(val):,}"
         draw.text((left_margin + bar_w + 15, y_pos + 12), val_str, font=font_value, fill=NAVY_COLOR)
 
-   # 6. YEAR DISPLAY (BOTTOM ALIGNED TO THE LAST BAR)
+    # 6. YEAR DISPLAY (BOTTOM-ALIGNED TO LAST BAR)
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
     year_h = bbox_year[3] - bbox_year[1]
     
-    # Calculate y position of the last (10th) bar's bottom edge
     last_bar_y_bottom = top_margin + (top_n - 1) * (bar_height + bar_gap) + bar_height
-    
-    # Position the year text so its baseline aligns with the bottom of the last bar
     year_y_pos = last_bar_y_bottom - year_h
     
     draw.text((width - year_w - 80, year_y_pos), year_str, font=font_big_year, fill=NAVY_COLOR)
@@ -326,7 +346,7 @@ def generate_brand_race_video(df, color_map, title, subtitle, theme_choice, outp
 # ---------------------------------------------------------
 if __name__ == "__main__":
     st.set_page_config(page_title="StatRise Race Studio", layout="wide")
-    st.title("StatRise Studio • Chart Race Video Generator")
+    st.title("StatRise Studio • Universal Video Generator")
 
     with st.sidebar:
         st.header("Display Theme")
@@ -335,22 +355,23 @@ if __name__ == "__main__":
     st.write("### 1. Video Customization")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="I WANT THIS BIG\nTHIS ALSO IN BIG", height=90)
+        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="MOST POPULAR FAST FOOD\nCHAINS IN THE US", height=90)
     with col_t2:
-        subtitle_input = st.text_input("Subtitle / Unit Measurement", value="MEASURED IN UNITS")
+        subtitle_input = st.text_input("Subtitle / Unit Measurement", value="NUMBER OF STORE LOCATIONS (1975 - 2025)")
 
-    st.write("### 2. Dataset Upload")
+    st.write("### 2. Universal Dataset Upload")
     uploaded_file = st.file_uploader("Upload CSV Dataset", type=["csv"])
 
     if uploaded_file is not None:
         if 'df' not in st.session_state or st.session_state.get('uploaded_filename') != uploaded_file.name:
             df = pd.read_csv(uploaded_file)
 
+            # Universal column parsing & melting
             if 'Date' not in df.columns or 'Category' not in df.columns or 'Value' not in df.columns:
-                id_vars = [col for col in df.columns if not str(col).isdigit()]
-                value_vars = [col for col in df.columns if str(col).isdigit()]
+                id_vars = [col for col in df.columns if not str(col).strip().isdigit()]
+                value_vars = [col for col in df.columns if str(col).strip().isdigit()]
 
-                cat_col = 'Country' if 'Country' in id_vars else (id_vars[0] if id_vars else df.columns[0])
+                cat_col = id_vars[0] if id_vars else df.columns[0]
 
                 df = df.melt(id_vars=id_vars, value_vars=value_vars, var_name='Date', value_name='Value')
                 df = df.rename(columns={cat_col: 'Category'})
@@ -378,7 +399,7 @@ if __name__ == "__main__":
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            status_text.text("Rendering video frames using system fonts...")
+            status_text.text("Rendering video frames...")
             progress_bar.progress(30)
             
             output_path = "statrise_race.mp4"
