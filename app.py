@@ -229,13 +229,19 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         val_str = f"{int(val):,}"
         draw.text((left_margin + bar_w + 15, y_pos + 12), val_str, font=font_value, fill=NAVY_COLOR)
 
-    # 6. YEAR DISPLAY
+   # 6. YEAR DISPLAY (BOTTOM ALIGNED TO THE LAST BAR)
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
     year_h = bbox_year[3] - bbox_year[1]
     
-    draw.text((width - year_w - 80, height - year_h - 80), year_str, font=font_big_year, fill=NAVY_COLOR)
+    # Calculate y position of the last (10th) bar's bottom edge
+    last_bar_y_bottom = top_margin + (top_n - 1) * (bar_height + bar_gap) + bar_height
+    
+    # Position the year text so its baseline aligns with the bottom of the last bar
+    year_y_pos = last_bar_y_bottom - year_h
+    
+    draw.text((width - year_w - 80, year_y_pos), year_str, font=font_big_year, fill=NAVY_COLOR)
 
     return np.array(img.convert("RGB"))
 
