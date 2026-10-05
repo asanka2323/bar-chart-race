@@ -50,36 +50,31 @@ COUNTRY_ISO_MAP = {
 }
 
 # ---------------------------------------------------------
-# RELIABLE DYNAMIC FONT GENERATOR
+# STEP 2: LINUX SYSTEM FONT LOADER (PACKAGES.TXT DRIVEN)
 # ---------------------------------------------------------
 @st.cache_resource
-def load_font_dynamic(size):
-    os.makedirs("fonts", exist_ok=True)
-    font_path = "fonts/Montserrat-ExtraBold.ttf"
+def load_system_font(size):
+    # Linux system font paths installed via packages.txt
+    system_fonts = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/ttf-bitstream-vera/VeraBd.ttf"
+    ]
     
-    if not os.path.exists(font_path):
-        url = "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-ExtraBold.ttf"
-        try:
-            res = requests.get(url, timeout=10)
-            if res.status_code == 200:
-                with open(font_path, "wb") as f:
-                    f.write(res.content)
-        except Exception:
-            pass
-
-    if os.path.exists(font_path):
-        try:
-            return ImageFont.truetype(font_path, size)
-        except Exception:
-            pass
-            
-    for fallback in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"]:
-        if os.path.exists(fallback):
+    for font_path in system_fonts:
+        if os.path.exists(font_path):
             try:
-                return ImageFont.truetype(fallback, size)
+                return ImageFont.truetype(font_path, size)
             except Exception:
-                pass
+                continue
 
+    # Windows fallback for local testing
+    try:
+        return ImageFont.truetype("arialbd.ttf", size)
+    except Exception:
+        pass
+
+    # Fallback if no TTF font is found
     return ImageFont.load_default()
 
 def hex_to_rgb(hex_str):
@@ -152,24 +147,22 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER (SUPER SCALED TYPOGRAPHY)
+# FRAME RENDERER (USING SYSTEM FONT SIZES)
 # ---------------------------------------------------------
 def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, 
                        title="I WANT THIS BIG\nTHIS ALSO IN BIG", 
                        subtitle="MEASURED IN UNITS", width=1080, height=1920):
     
     bg_color = theme_config["bg_color"]
-    
-    # Render on a high-res 1080x1920 canvas
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # 1. LOAD MASSIVE FONTS (EXPANDED TO OCCUPY CANVAS PROPORTIONATELY)
-    font_main_title = load_font_dynamic(110)
-    font_subtitle   = load_font_dynamic(50)
-    font_big_year   = load_font_dynamic(200)
-    font_label      = load_font_dynamic(40)
-    font_value      = load_font_dynamic(40)
+    # 1. LOAD SYSTEM FONTS AT GIANT SIZES
+    font_main_title = load_system_font(110)
+    font_subtitle   = load_system_font(50)
+    font_big_year   = load_system_font(200)
+    font_label      = load_system_font(40)
+    font_value      = load_system_font(40)
 
     NAVY_COLOR = (18, 30, 66, 255)
 
@@ -184,7 +177,7 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     # 3. RENDER SUBTITLE
     draw.text((80, y_offset + 15), str(subtitle).strip().upper(), font=font_subtitle, fill=NAVY_COLOR)
 
-    # 4. CHART LAYOUT POSITIONS
+    # 4. CHART MARGINS AND GRID
     top_margin = y_offset + 140
     bottom_margin = 280
     left_margin = 380
@@ -192,7 +185,6 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
-    # Grid Lines
     for i in range(5):
         gx = left_margin + (chart_width / 4) * i
         draw.line([(gx, top_margin), (gx, height - bottom_margin)], fill=(218, 216, 206), width=4)
@@ -237,7 +229,7 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         val_str = f"{int(val):,}"
         draw.text((left_margin + bar_w + 20, y_pos + 5), val_str, font=font_value, fill=NAVY_COLOR)
 
-    # 6. GIANT YEAR DISPLAY AT BOTTOM RIGHT
+    # 6. GIANT YEAR DISPLAY
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
@@ -324,7 +316,7 @@ def generate_brand_race_video(df, color_map, title, subtitle, theme_choice, outp
     )
 
 # ---------------------------------------------------------
-# STREAMLIT APPLICATION INTERFACE
+# STREAMLIT UI
 # ---------------------------------------------------------
 if __name__ == "__main__":
     st.set_page_config(page_title="StatRise Race Studio", layout="wide")
@@ -380,7 +372,7 @@ if __name__ == "__main__":
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            status_text.text("Rendering video frames with scaled fonts...")
+            status_text.text("Rendering video frames using system fonts...")
             progress_bar.progress(30)
             
             output_path = "statrise_race.mp4"
