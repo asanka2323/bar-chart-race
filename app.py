@@ -147,7 +147,7 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER (USING SYSTEM FONT SIZES)
+# FRAME RENDERER (UPDATED FONT SIZES)
 # ---------------------------------------------------------
 def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, 
                        title="I WANT THIS BIG\nTHIS ALSO IN BIG", 
@@ -157,12 +157,12 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # 1. LOAD SYSTEM FONTS AT GIANT SIZES
-    font_main_title = load_system_font(110)
-    font_subtitle   = load_system_font(50)
-    font_big_year   = load_system_font(200)
-    font_label      = load_system_font(40)
-    font_value      = load_system_font(40)
+    # 1. LOAD SYSTEM FONTS WITH CUSTOM SIZES
+    font_main_title = load_system_font(100) # Updated: 100px
+    font_subtitle   = load_system_font(40)  # Updated: 40px
+    font_big_year   = load_system_font(120) # Updated: 120px
+    font_label      = load_system_font(20)  # Updated: 20px
+    font_value      = load_system_font(20)  # Updated: 20px
 
     NAVY_COLOR = (18, 30, 66, 255)
 
@@ -172,15 +172,15 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     for line in title_lines:
         draw.text((80, y_offset), line, font=font_main_title, fill=NAVY_COLOR)
         bbox = draw.textbbox((0, 0), line, font=font_main_title)
-        y_offset += (bbox[3] - bbox[1]) + 25
+        y_offset += (bbox[3] - bbox[1]) + 20
 
     # 3. RENDER SUBTITLE
     draw.text((80, y_offset + 15), str(subtitle).strip().upper(), font=font_subtitle, fill=NAVY_COLOR)
 
     # 4. CHART MARGINS AND GRID
-    top_margin = y_offset + 140
-    bottom_margin = 280
-    left_margin = 380
+    top_margin = y_offset + 120
+    bottom_margin = 250
+    left_margin = 350
     right_margin = 160
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
@@ -210,15 +210,15 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         color_rgb = hex_to_rgb(color_hex)
 
         # Entity Label Text
-        label_text = cat_name[:12]
-        draw.text((60, y_pos + 5), label_text, font=font_label, fill=NAVY_COLOR)
+        label_text = cat_name[:14]
+        draw.text((60, y_pos + 12), label_text, font=font_label, fill=NAVY_COLOR)
 
         # Flag Icon
         icon_img = loaded_flags.get(cat_name)
         icon_size = int(bar_height * 0.95)
         if icon_img:
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
-            img.paste(icon_resized, (270, int(y_pos)), icon_resized)
+            img.paste(icon_resized, (250, int(y_pos)), icon_resized)
 
         # Bar Shape
         if bar_w > 5:
@@ -227,15 +227,15 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
 
         # Value Text
         val_str = f"{int(val):,}"
-        draw.text((left_margin + bar_w + 20, y_pos + 5), val_str, font=font_value, fill=NAVY_COLOR)
+        draw.text((left_margin + bar_w + 15, y_pos + 12), val_str, font=font_value, fill=NAVY_COLOR)
 
-    # 6. GIANT YEAR DISPLAY
+    # 6. YEAR DISPLAY
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
     year_h = bbox_year[3] - bbox_year[1]
     
-    draw.text((width - year_w - 80, height - year_h - 100), year_str, font=font_big_year, fill=NAVY_COLOR)
+    draw.text((width - year_w - 80, height - year_h - 80), year_str, font=font_big_year, fill=NAVY_COLOR)
 
     return np.array(img.convert("RGB"))
 
