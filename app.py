@@ -140,14 +140,14 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER (MATCHING YOUR ATTACHMENT DESIGN)
+# FRAME RENDERER
 # ---------------------------------------------------------
 def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, title="STATE GDP\nGROWTH", subtitle="MEASURED IN CURRENT MILLIONS", width=720, height=1280):
     bg_color = theme_config["bg_color"]
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # Fonts matching attached image design
+    # Fonts
     font_main_title = load_brand_font("Montserrat", "ExtraBold", 46)
     font_subtitle = load_brand_font("Montserrat", "ExtraBold", 20)
     font_big_year = load_brand_font("Montserrat", "ExtraBold", 110)
@@ -170,7 +170,7 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         gx = left_margin + (chart_width / 4) * i
         draw.line([(gx, top_margin - 10), (gx, height - bottom_margin)], fill=grid_color[:3], width=1)
 
-    # 2. Main Title (Top Left, Bold & Multiline)
+    # 2. Main Title (Top Left, Multiline)
     title_lines = str(title).strip().upper().split('\n')
     y_title_offset = 35
     for line in title_lines:
@@ -201,7 +201,7 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         color_hex = color_map.get(cat_name, theme_config["bar_primary"])
         color_rgb = hex_to_rgb(color_hex)
 
-        # Entity Label (Left)
+        # Entity Label
         label_text = cat_name[:12]
         bbox = draw.textbbox((0, 0), label_text, font=font_label)
         text_w = bbox[2] - bbox[0]
@@ -221,20 +221,20 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
             initials = cat_name[:2].upper()
             draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_label, fill=(255, 255, 255))
 
-        # Bar Rect
+        # Bar Rectangle
         if bar_w > 5:
             bar_rect = [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height]
             draw.rounded_rectangle(bar_rect, radius=3, fill=color_rgb)
             if theme_config["bar_stroke"]:
                 draw.rounded_rectangle(bar_rect, radius=3, outline=(255, 255, 255), width=2)
 
-        # Value Number (Right of bar)
+        # Value Label
         val_str = f"{int(val):,}"
         val_bbox = draw.textbbox((0, 0), val_str, font=font_value)
         val_h = val_bbox[3] - val_bbox[1]
         draw.text((left_margin + bar_w + 10, y_pos + (bar_height - val_h) / 2 - 2), val_str, font=font_value, fill=theme_config["value_color"])
 
-    # 4. Big Bold Year Counter (Bottom Right Position as per Attachment)
+    # 4. Big Bold Year Counter (Bottom Right)
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
@@ -331,6 +331,15 @@ if __name__ == "__main__":
         st.header("Display Theme")
         theme_choice = st.radio("Select Theme Mode", list(THEMES.keys()), index=0)
 
+    # Title & Subtitle inputs placed prominently before uploading
+    st.write("### 1. Video Customization")
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="STATE GDP\nGROWTH", height=90)
+    with col_t2:
+        subtitle_input = st.text_input("Subtitle / Unit Measurement", value="MEASURED IN CURRENT MILLIONS")
+
+    st.write("### 2. Dataset Upload")
     uploaded_file = st.file_uploader("Upload CSV Dataset", type=["csv"])
 
     if uploaded_file is not None:
@@ -355,14 +364,7 @@ if __name__ == "__main__":
 
         st.write("### Dataset Preview", df.head())
 
-        st.write("### 1. Custom Video Titles")
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
-            title_input = st.text_area("Main Video Title (Use enter for new line)", value="STATE GDP\nGROWTH", height=90)
-        with col_t2:
-            subtitle_input = st.text_input("Subtitle / Unit Measurement", value="MEASURED IN CURRENT MILLIONS")
-
-        st.write("### 2. Custom Bar Colors")
+        st.write("### 3. Custom Bar Colors")
         unique_entities = sorted(df['Category'].unique())
         color_map = {}
 
@@ -402,4 +404,4 @@ if __name__ == "__main__":
         if 'video_bytes' in st.session_state:
             st.video(st.session_state['video_bytes'])
     else:
-        st.info("Upload a CSV file to enter video titles, select colors, and render your chart race video.")
+        st.info("Upload a CSV file above to set colors and render your chart race video.")
