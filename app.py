@@ -15,34 +15,34 @@ THEMES = {
     "Light Mode (Default)": {
         "bg_color": (248, 249, 250),       # #F8F9FA Off-white
         "title_color": (17, 24, 39),       # #111827
-        "subtitle_color": (75, 85, 99),    # #4B5563
-        "grid_color": (229, 231, 235, 102),# #E5E7EB at 40% opacity
+        "subtitle_color": (31, 41, 55),    # #1F2937 Dark Slate
+        "grid_color": (209, 213, 219, 150),# #D1D5DB Grid
         "label_color": (17, 24, 39),      # #111827
         "value_color": (17, 24, 39),      # #111827
+        "year_color": (30, 58, 138),       # #1E3A8A Dark Navy
         "bar_primary": "#1E3A8A",          # StatRise Blue
         "bar_lead": "#111827",             # StatRise Black for #1 rank
-        "bar_overtake": "#B91C1C",         # Growth Red
         "show_flag_accent": True,
         "bar_stroke": False
     },
     "Dark Mode (Shorts)": {
         "bg_color": (15, 23, 42),         # #0F172A Deep Navy
         "title_color": (249, 250, 251),    # #F9FAFB
-        "subtitle_color": (156, 163, 175), # #9CA3AF
-        "grid_color": (30, 41, 59, 153),   # #1E293B at 60% opacity
+        "subtitle_color": (209, 213, 219), # #D1D5DB
+        "grid_color": (30, 41, 59, 180),   # #1E293B
         "label_color": (249, 250, 251),   # #F9FAFB
         "value_color": (249, 250, 251),   # #F9FAFB
+        "year_color": (249, 250, 251),    # White / Light Gray
         "bar_primary": "#1E3A8A",          # StatRise Blue
         "bar_lead": "#111827",             # StatRise Black
-        "bar_overtake": "#B91C1C",         # Growth Red
-        "show_flag_accent": False,         # NO flag in dark mode
+        "show_flag_accent": False,
         "bar_stroke": True
     }
 }
 
 DEFAULT_ACCENT_COLORS = [
-    "#1E3A8A", "#111827", "#2563EB", "#0D9488", "#D97706",
-    "#7C3AED", "#DC2626", "#059669", "#4F46E5", "#9333EA"
+    "#1E3A8A", "#111827", "#15803D", "#B91C1C", "#D97706",
+    "#7C3AED", "#2563EB", "#059669", "#4F46E5", "#9333EA"
 ]
 
 COUNTRY_ISO_MAP = {
@@ -57,7 +57,6 @@ COUNTRY_ISO_MAP = {
 # FONT HELPER (Montserrat & Inter System)
 # ---------------------------------------------------------
 def load_brand_font(family="Montserrat", variant="Bold", size=20):
-    """Loads Montserrat or Inter from local disk or falls back to system fonts."""
     font_files = [
         f"fonts/{family}-{variant}.ttf",
         f"{family}-{variant}.ttf",
@@ -79,7 +78,7 @@ def ease_in_out_cubic(t):
     return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
 
 # ---------------------------------------------------------
-# ACCENT & FLAG HELPERS
+# FLAG & ICON HELPERS
 # ---------------------------------------------------------
 def get_flag_url(category_name, given_flag_url=None):
     if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
@@ -141,23 +140,22 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER (STATRISE BRAND BOOK STANDARD)
+# FRAME RENDERER (MATCHING YOUR ATTACHMENT DESIGN)
 # ---------------------------------------------------------
-def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, title="STATRISE", subtitle="VISUALIZING AMERICA IN MOTION", width=720, height=1280):
+def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, title="STATE GDP\nGROWTH", subtitle="MEASURED IN CURRENT MILLIONS", width=720, height=1280):
     bg_color = theme_config["bg_color"]
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # Fonts from Brand Book System
-    font_brand_logo = load_brand_font("Montserrat", "ExtraBold", 28)
-    font_title = load_brand_font("Montserrat", "Bold", 20)
-    font_subtitle = load_brand_font("Inter", "Medium", 14)
-    font_year = load_brand_font("Montserrat", "ExtraBold", 38)
+    # Fonts matching attached image design
+    font_main_title = load_brand_font("Montserrat", "ExtraBold", 46)
+    font_subtitle = load_brand_font("Montserrat", "ExtraBold", 20)
+    font_big_year = load_brand_font("Montserrat", "ExtraBold", 110)
     font_label = load_brand_font("Inter", "Medium", 18)
     font_value = load_brand_font("Montserrat", "Bold", 20)
 
-    top_margin = 210
-    bottom_margin = 80
+    top_margin = 230
+    bottom_margin = 120
     label_right_align = 125
     flag_x = 135
     left_margin = 190
@@ -166,27 +164,28 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
-    # 1. Background Grid Lines (Brand Rule #1)
+    # 1. Background Grid Lines
     grid_color = theme_config["grid_color"]
     for i in range(5):
         gx = left_margin + (chart_width / 4) * i
         draw.line([(gx, top_margin - 10), (gx, height - bottom_margin)], fill=grid_color[:3], width=1)
 
-    # 2. Header Area & StatRise Brand Mark
-    draw.text((35, 35), "STATRISE", font=font_brand_logo, fill=theme_config["title_color"])
-    draw.text((35, 75), str(title).upper(), font=font_title, fill=theme_config["title_color"])
-    draw.text((35, 105), str(subtitle).upper(), font=font_subtitle, fill=theme_config["subtitle_color"])
+    # 2. Main Title (Top Left, Bold & Multiline)
+    title_lines = str(title).strip().upper().split('\n')
+    y_title_offset = 35
+    for line in title_lines:
+        draw.text((35, y_title_offset), line, font=font_main_title, fill=theme_config["title_color"])
+        bbox = draw.textbbox((0, 0), line, font=font_main_title)
+        y_title_offset += (bbox[3] - bbox[1]) + 5
 
-    # 3. Year Counter (Top Right)
-    year_str = f"{int(year_label)}"
-    bbox_y = draw.textbbox((0, 0), year_str, font=font_year)
-    draw.text((width - (bbox_y[2] - bbox_y[0]) - 35, 45), year_str, font=font_year, fill=theme_config["title_color"])
+    # 3. Subtitle (Below Main Title)
+    draw.text((35, y_title_offset + 5), str(subtitle).strip().upper(), font=font_subtitle, fill=theme_config["subtitle_color"])
 
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
 
-    bar_height = (chart_height / top_n) * 0.60
-    bar_gap = (chart_height / top_n) * 0.40
+    bar_height = (chart_height / top_n) * 0.58
+    bar_gap = (chart_height / top_n) * 0.42
 
     for _, row in df_frame.iterrows():
         cat_name = str(row['Category'])
@@ -199,22 +198,17 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         y_pos = top_margin + rank * (bar_height + bar_gap)
         bar_w = (val / max_val) * chart_width if max_val > 0 else 0
 
-        # Bar Color Rule (Rank #1 gets Brand Black/Blue accent)
-        if rank < 0.5:
-            color_hex = theme_config["bar_lead"]
-        else:
-            color_hex = color_map.get(cat_name, theme_config["bar_primary"])
-            
+        color_hex = color_map.get(cat_name, theme_config["bar_primary"])
         color_rgb = hex_to_rgb(color_hex)
 
-        # 4. Entity Label
+        # Entity Label (Left)
         label_text = cat_name[:12]
         bbox = draw.textbbox((0, 0), label_text, font=font_label)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         draw.text((max(10, label_right_align - text_w), y_pos + (bar_height - text_h) / 2 - 2), label_text, font=font_label, fill=theme_config["label_color"])
 
-        # 5. Entity Icon / Circular Flag
+        # Flag / Circle Icon
         icon_img = loaded_flags.get(cat_name)
         icon_size = int(bar_height * 0.95)
         icon_y = int(y_pos + (bar_height - icon_size) / 2)
@@ -225,20 +219,28 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         else:
             draw.ellipse([flag_x, icon_y, flag_x + icon_size, icon_y + icon_size], fill=color_rgb)
             initials = cat_name[:2].upper()
-            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_subtitle, fill=(255, 255, 255))
+            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_label, fill=(255, 255, 255))
 
-        # 6. Bar Drawing (Clean 4px Radius)
+        # Bar Rect
         if bar_w > 5:
             bar_rect = [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height]
-            draw.rounded_rectangle(bar_rect, radius=4, fill=color_rgb)
+            draw.rounded_rectangle(bar_rect, radius=3, fill=color_rgb)
             if theme_config["bar_stroke"]:
-                draw.rounded_rectangle(bar_rect, radius=4, outline=(255, 255, 255), width=2)
+                draw.rounded_rectangle(bar_rect, radius=3, outline=(255, 255, 255), width=2)
 
-        # 7. Value Label
+        # Value Number (Right of bar)
         val_str = f"{int(val):,}"
         val_bbox = draw.textbbox((0, 0), val_str, font=font_value)
         val_h = val_bbox[3] - val_bbox[1]
         draw.text((left_margin + bar_w + 10, y_pos + (bar_height - val_h) / 2 - 2), val_str, font=font_value, fill=theme_config["value_color"])
+
+    # 4. Big Bold Year Counter (Bottom Right Position as per Attachment)
+    year_str = f"{int(year_label)}"
+    bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
+    year_w = bbox_year[2] - bbox_year[0]
+    year_h = bbox_year[3] - bbox_year[1]
+    
+    draw.text((width - year_w - 45, height - year_h - 70), year_str, font=font_big_year, fill=theme_config["year_color"])
 
     return np.array(img.convert("RGB"))
 
@@ -323,14 +325,13 @@ def generate_brand_race_video(df, color_map, title, subtitle, theme_choice, outp
 # ---------------------------------------------------------
 if __name__ == "__main__":
     st.set_page_config(page_title="StatRise Race Studio", layout="wide")
-    st.title("StatRise Studio V1.0 • Brand Compliant Generator")
+    st.title("StatRise Studio • Chart Race Video Generator")
 
     with st.sidebar:
-        st.header("Brand Settings")
-        theme_choice = st.radio("Select Theme", list(THEMES.keys()), index=0)
-        st.info("Light Mode is default for long videos & core content. Dark Mode is optimized for Shorts/Reels.")
+        st.header("Display Theme")
+        theme_choice = st.radio("Select Theme Mode", list(THEMES.keys()), index=0)
 
-    uploaded_file = st.file_uploader("Upload Dataset (CSV)", type=["csv"])
+    uploaded_file = st.file_uploader("Upload CSV Dataset", type=["csv"])
 
     if uploaded_file is not None:
         if 'df' not in st.session_state or st.session_state.get('uploaded_filename') != uploaded_file.name:
@@ -354,13 +355,14 @@ if __name__ == "__main__":
 
         st.write("### Dataset Preview", df.head())
 
+        st.write("### 1. Custom Video Titles")
         col_t1, col_t2 = st.columns(2)
         with col_t1:
-            title_input = st.text_input("Main Title", value="U.S. STATE GDP GROWTH")
+            title_input = st.text_area("Main Video Title (Use enter for new line)", value="STATE GDP\nGROWTH", height=90)
         with col_t2:
-            subtitle_input = st.text_input("Subtitle", value="VISUALIZING AMERICA IN MOTION")
+            subtitle_input = st.text_input("Subtitle / Unit Measurement", value="MEASURED IN CURRENT MILLIONS")
 
-        st.write("### Custom Entity Colors")
+        st.write("### 2. Custom Bar Colors")
         unique_entities = sorted(df['Category'].unique())
         color_map = {}
 
@@ -370,11 +372,11 @@ if __name__ == "__main__":
             with cols[idx % 4]:
                 color_map[entity] = st.color_picker(f"Color: {entity}", value=default_hex, key=f"cp_{entity}")
 
-        if st.button("Generate Brand Video"):
+        if st.button("Generate Video"):
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            status_text.text("Preparing fonts & flags...")
+            status_text.text("Fetching assets and rendering video frames...")
             progress_bar.progress(30)
             
             output_path = "statrise_race.mp4"
@@ -395,9 +397,9 @@ if __name__ == "__main__":
             with open(output_path, "rb") as vf:
                 st.session_state['video_bytes'] = vf.read()
 
-            st.success("StatRise brand video generated successfully!")
+            st.success("Chart race video generated successfully!")
 
         if 'video_bytes' in st.session_state:
             st.video(st.session_state['video_bytes'])
     else:
-        st.info("Upload a CSV file to customize colors, titles, and render your video.")
+        st.info("Upload a CSV file to enter video titles, select colors, and render your chart race video.")
