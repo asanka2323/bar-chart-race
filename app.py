@@ -9,19 +9,78 @@ from PIL import Image, ImageDraw, ImageFont
 from moviepy import VideoClip
 
 # ---------------------------------------------------------
-# COUNTRY ISO MAP FOR AUTO-FLAG LOOKUP
+# BRAND BOOK V1.0 COLOR PALETTE & CONFIGURATION
 # ---------------------------------------------------------
+THEMES = {
+    "Light Mode (Default)": {
+        "bg_color": (248, 249, 250),       # #F8F9FA Off-white
+        "title_color": (17, 24, 39),       # #111827
+        "subtitle_color": (75, 85, 99),    # #4B5563
+        "grid_color": (229, 231, 235, 102),# #E5E7EB at 40% opacity
+        "label_color": (17, 24, 39),      # #111827
+        "value_color": (17, 24, 39),      # #111827
+        "bar_primary": "#1E3A8A",          # StatRise Blue
+        "bar_lead": "#111827",             # StatRise Black for #1 rank
+        "bar_overtake": "#B91C1C",         # Growth Red
+        "show_flag_accent": True,
+        "bar_stroke": False
+    },
+    "Dark Mode (Shorts)": {
+        "bg_color": (15, 23, 42),         # #0F172A Deep Navy
+        "title_color": (249, 250, 251),    # #F9FAFB
+        "subtitle_color": (156, 163, 175), # #9CA3AF
+        "grid_color": (30, 41, 59, 153),   # #1E293B at 60% opacity
+        "label_color": (249, 250, 251),   # #F9FAFB
+        "value_color": (249, 250, 251),   # #F9FAFB
+        "bar_primary": "#1E3A8A",          # StatRise Blue
+        "bar_lead": "#111827",             # StatRise Black
+        "bar_overtake": "#B91C1C",         # Growth Red
+        "show_flag_accent": False,         # NO flag in dark mode
+        "bar_stroke": True
+    }
+}
+
+DEFAULT_ACCENT_COLORS = [
+    "#1E3A8A", "#111827", "#2563EB", "#0D9488", "#D97706",
+    "#7C3AED", "#DC2626", "#059669", "#4F46E5", "#9333EA"
+]
+
 COUNTRY_ISO_MAP = {
     "united states": "us", "usa": "us", "japan": "jp", "germany": "de",
     "france": "fr", "spain": "es", "south korea": "kr", "china": "cn",
     "mexico": "mx", "brazil": "br", "malaysia": "my", "indonesia": "id",
     "italy": "it", "united kingdom": "gb", "uk": "gb", "canada": "ca",
-    "india": "in", "russia": "ru", "russian federation": "ru",
-    "poland": "pl", "portugal": "pt", "romania": "ro", "slovakia": "sk",
-    "south africa": "za", "sweden": "se", "thailand": "th", "turkey": "tr",
-    "uzbekistan": "uz"
+    "india": "in", "russia": "ru", "poland": "pl", "texas": "us-tx", "california": "us-ca"
 }
 
+# ---------------------------------------------------------
+# FONT HELPER (Montserrat & Inter System)
+# ---------------------------------------------------------
+def load_brand_font(family="Montserrat", variant="Bold", size=20):
+    """Loads Montserrat or Inter from local disk or falls back to system fonts."""
+    font_files = [
+        f"fonts/{family}-{variant}.ttf",
+        f"{family}-{variant}.ttf",
+        "DejaVuSans-Bold.ttf" if "Bold" in variant else "DejaVuSans.ttf",
+        "Arial.ttf"
+    ]
+    for font_path in font_files:
+        try:
+            return ImageFont.truetype(font_path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+def hex_to_rgb(hex_str):
+    hex_str = hex_str.lstrip('#')
+    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+
+def ease_in_out_cubic(t):
+    return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
+
+# ---------------------------------------------------------
+# ACCENT & FLAG HELPERS
+# ---------------------------------------------------------
 def get_flag_url(category_name, given_flag_url=None):
     if given_flag_url and pd.notna(given_flag_url) and str(given_flag_url).strip() != "":
         url_str = str(given_flag_url).strip()
@@ -31,7 +90,7 @@ def get_flag_url(category_name, given_flag_url=None):
 
     clean_name = str(category_name).strip().lower()
     iso = COUNTRY_ISO_MAP.get(clean_name)
-    if iso:
+    if iso and not iso.startswith("us-"):
         return f"https://flagcdn.com/w160/{iso}.png"
     return None
 
@@ -39,9 +98,8 @@ def load_circular_image(url_or_path):
     if not url_or_path or pd.isna(url_or_path) or str(url_or_path).strip() == "":
         return None
     url_str = str(url_or_path).strip()
-    
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        headers = {'User-Agent': 'Mozilla/5.0'}
         if url_str.startswith("http://") or url_str.startswith("https://"):
             res = requests.get(url_str, headers=headers, timeout=5)
             if res.status_code == 200:
@@ -69,8 +127,7 @@ def load_circular_image(url_or_path):
 
 def fetch_all_flags(df):
     flag_dict = {}
-    categories = df['Category'].unique()
-    for cat in categories:
+    for cat in df['Category'].unique():
         given_flag = None
         if 'Flag' in df.columns:
             sub = df[df['Category'] == cat]
@@ -84,79 +141,46 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# DRAWING & FONT UTILITIES
+# FRAME RENDERER (STATRISE BRAND BOOK STANDARD)
 # ---------------------------------------------------------
-def load_font(size, bold=False):
-    font_names = [
-        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
-        "Arial.ttf",
-        "LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf"
-    ]
-    for font_name in font_names:
-        try:
-            return ImageFont.truetype(font_name, size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
-
-def ease_in_out_cubic(t):
-    return 4 * t * t * t if t < 0.5 else 1 - math.pow(-2 * t + 2, 3) / 2
-
-def draw_rounded_rect(draw, xy, corner_radius, fill=None):
-    x1, y1, x2, y2 = xy
-    if x2 - x1 < corner_radius * 2:
-        corner_radius = max(1, (x2 - x1) / 2)
-    draw.rectangle([x1 + corner_radius, y1, x2 - corner_radius, y2], fill=fill)
-    draw.rectangle([x1, y1 + corner_radius, x2, y2 - corner_radius], fill=fill)
-    draw.pieslice([x1, y1, x1 + 2 * corner_radius, y1 + 2 * corner_radius], 180, 270, fill=fill)
-    draw.pieslice([x2 - 2 * corner_radius, y1, x2, y1 + 2 * corner_radius], 270, 360, fill=fill)
-    draw.pieslice([x1, y2 - 2 * corner_radius, x1 + 2 * corner_radius, y2], 90, 180, fill=fill)
-    draw.pieslice([x2 - 2 * corner_radius, y2 - 2 * corner_radius, x2, y2], 0, 90, fill=fill)
-
-DEFAULT_PALETTE = [
-    "#FFD700", "#00BFFF", "#00EEEE", "#FF4500", "#FF0080",
-    "#BA55D3", "#7FFF00", "#00FF99", "#FFBF00", "#FF1493"
-]
-
-def hex_to_rgb(hex_str):
-    hex_str = hex_str.lstrip('#')
-    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
-
-# ---------------------------------------------------------
-# FRAME RENDERER (LARGER FONTS & PERFECT ALIGNMENT)
-# ---------------------------------------------------------
-def render_cyberpunk_frame(df_frame, year_label, color_map, loaded_flags, title="BAR CHART RACE", subtitle="CYBERPUNK EDITION", width=720, height=1280):
-    bg_color = (13, 17, 23)
+def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, title="STATRISE", subtitle="VISUALIZING AMERICA IN MOTION", width=720, height=1280):
+    bg_color = theme_config["bg_color"]
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # Pre-load custom fonts at larger sizes
-    font_title = load_font(24, bold=True)
-    font_subtitle = load_font(18, bold=True)
-    font_label = load_font(18, bold=True)
-    font_value = load_font(18, bold=True)
-    font_year = load_font(22, bold=True)
+    # Fonts from Brand Book System
+    font_brand_logo = load_brand_font("Montserrat", "ExtraBold", 28)
+    font_title = load_brand_font("Montserrat", "Bold", 20)
+    font_subtitle = load_brand_font("Inter", "Medium", 14)
+    font_year = load_brand_font("Montserrat", "ExtraBold", 38)
+    font_label = load_brand_font("Inter", "Medium", 18)
+    font_value = load_brand_font("Montserrat", "Bold", 20)
 
-    top_margin = 180
+    top_margin = 210
     bottom_margin = 80
-    
-    # Layout spacing coordinates
-    label_right_align = 125  # End of country name label
-    flag_x = 135             # Flag icon start
-    left_margin = 200        # Animated bar start
-    right_margin = 110       # Right margin for numbers
-    
+    label_right_align = 125
+    flag_x = 135
+    left_margin = 190
+    right_margin = 110
+
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
-    # Header Card
-    draw.rectangle([20, 35, width - 20, 145], outline=(0, 255, 153), width=2)
-    draw.text((40, 50), str(title).upper(), font=font_title, fill=(255, 255, 255))
-    draw.text((40, 95), str(subtitle).upper(), font=font_subtitle, fill=(0, 255, 153))
+    # 1. Background Grid Lines (Brand Rule #1)
+    grid_color = theme_config["grid_color"]
+    for i in range(5):
+        gx = left_margin + (chart_width / 4) * i
+        draw.line([(gx, top_margin - 10), (gx, height - bottom_margin)], fill=grid_color[:3], width=1)
 
-    # Year Display Card
-    draw.rectangle([width - 240, 55, width - 40, 125], outline=(0, 255, 153), width=2)
-    draw.text((width - 220, 75), f"YEAR: {int(year_label)}", font=font_year, fill=(0, 255, 153))
+    # 2. Header Area & StatRise Brand Mark
+    draw.text((35, 35), "STATRISE", font=font_brand_logo, fill=theme_config["title_color"])
+    draw.text((35, 75), str(title).upper(), font=font_title, fill=theme_config["title_color"])
+    draw.text((35, 105), str(subtitle).upper(), font=font_subtitle, fill=theme_config["subtitle_color"])
+
+    # 3. Year Counter (Top Right)
+    year_str = f"{int(year_label)}"
+    bbox_y = draw.textbbox((0, 0), year_str, font=font_year)
+    draw.text((width - (bbox_y[2] - bbox_y[0]) - 35, 45), year_str, font=font_year, fill=theme_config["title_color"])
 
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
@@ -175,19 +199,22 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, loaded_flags, title=
         y_pos = top_margin + rank * (bar_height + bar_gap)
         bar_w = (val / max_val) * chart_width if max_val > 0 else 0
 
-        color_hex = color_map.get(cat_name, "#00FF99")
+        # Bar Color Rule (Rank #1 gets Brand Black/Blue accent)
+        if rank < 0.5:
+            color_hex = theme_config["bar_lead"]
+        else:
+            color_hex = color_map.get(cat_name, theme_config["bar_primary"])
+            
         color_rgb = hex_to_rgb(color_hex)
 
-        # 1. Text Label (Right-aligned with larger font size)
+        # 4. Entity Label
         label_text = cat_name[:12]
         bbox = draw.textbbox((0, 0), label_text, font=font_label)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        text_x = label_right_align - text_w
-        text_y = y_pos + (bar_height - text_h) / 2 - 2
-        draw.text((max(10, text_x), text_y), label_text, font=font_label, fill=(255, 255, 255))
+        draw.text((max(10, label_right_align - text_w), y_pos + (bar_height - text_h) / 2 - 2), label_text, font=font_label, fill=theme_config["label_color"])
 
-        # 2. Flag Image Placement
+        # 5. Entity Icon / Circular Flag
         icon_img = loaded_flags.get(cat_name)
         icon_size = int(bar_height * 0.95)
         icon_y = int(y_pos + (bar_height - icon_size) / 2)
@@ -196,28 +223,30 @@ def render_cyberpunk_frame(df_frame, year_label, color_map, loaded_flags, title=
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
             img.paste(icon_resized, (flag_x, icon_y), icon_resized)
         else:
-            # Fallback Circle with Initials
-            draw.ellipse([flag_x, icon_y, flag_x + icon_size, icon_y + icon_size], outline=color_rgb, width=2)
+            draw.ellipse([flag_x, icon_y, flag_x + icon_size, icon_y + icon_size], fill=color_rgb)
             initials = cat_name[:2].upper()
-            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_label, fill=(255, 255, 255))
+            draw.text((flag_x + int(icon_size / 4), icon_y + int(icon_size / 4)), initials, font=font_subtitle, fill=(255, 255, 255))
 
-        # 3. Bar
+        # 6. Bar Drawing (Clean 4px Radius)
         if bar_w > 5:
-            draw_rounded_rect(draw, [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height], corner_radius=8, fill=color_rgb)
+            bar_rect = [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height]
+            draw.rounded_rectangle(bar_rect, radius=4, fill=color_rgb)
+            if theme_config["bar_stroke"]:
+                draw.rounded_rectangle(bar_rect, radius=4, outline=(255, 255, 255), width=2)
 
-        # 4. Value Text (Larger font size)
+        # 7. Value Label
         val_str = f"{int(val):,}"
         val_bbox = draw.textbbox((0, 0), val_str, font=font_value)
         val_h = val_bbox[3] - val_bbox[1]
-        val_y = y_pos + (bar_height - val_h) / 2 - 2
-        draw.text((left_margin + bar_w + 10, val_y), val_str, font=font_value, fill=color_rgb)
+        draw.text((left_margin + bar_w + 10, y_pos + (bar_height - val_h) / 2 - 2), val_str, font=font_value, fill=theme_config["value_color"])
 
     return np.array(img.convert("RGB"))
 
 # ---------------------------------------------------------
-# FAST VIDEO GENERATION ENGINE
+# VIDEO ENGINE
 # ---------------------------------------------------------
-def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_race.mp4", fps=20, seconds_per_year=1.0):
+def generate_brand_race_video(df, color_map, title, subtitle, theme_choice, output_path="statrise_race.mp4", fps=20, seconds_per_year=1.0):
+    theme_config = THEMES[theme_choice]
     loaded_flags = fetch_all_flags(df)
 
     years = sorted(df['Date'].unique())
@@ -274,7 +303,7 @@ def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_r
         sub_df = df_interp[df_interp['Frame'] == frame_idx]
         year_lbl = sub_df['YearLabel'].iloc[0] if not sub_df.empty else years[0]
         
-        return render_cyberpunk_frame(sub_df, year_label=year_lbl, color_map=color_map, loaded_flags=loaded_flags, title=title, subtitle=subtitle)
+        return render_brand_frame(sub_df, year_label=year_lbl, color_map=color_map, loaded_flags=loaded_flags, theme_config=theme_config, title=title, subtitle=subtitle)
 
     duration = total_frames / fps
     clip = VideoClip(make_frame, duration=duration)
@@ -290,11 +319,16 @@ def generate_race_video(df, color_map, title, subtitle, output_path="bar_chart_r
     )
 
 # ---------------------------------------------------------
-# STREAMLIT UI
+# STREAMLIT USER INTERFACE
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    st.set_page_config(page_title="Vertical Bar Chart Race", layout="wide")
-    st.title("Vertical Cyberpunk Bar Chart Race Generator")
+    st.set_page_config(page_title="StatRise Race Studio", layout="wide")
+    st.title("StatRise Studio V1.0 • Brand Compliant Generator")
+
+    with st.sidebar:
+        st.header("Brand Settings")
+        theme_choice = st.radio("Select Theme", list(THEMES.keys()), index=0)
+        st.info("Light Mode is default for long videos & core content. Dark Mode is optimized for Shorts/Reels.")
 
     uploaded_file = st.file_uploader("Upload Dataset (CSV)", type=["csv"])
 
@@ -322,9 +356,9 @@ if __name__ == "__main__":
 
         col_t1, col_t2 = st.columns(2)
         with col_t1:
-            title_input = st.text_input("Main Title", value="WORLD CAR MANUFACTURING")
+            title_input = st.text_input("Main Title", value="U.S. STATE GDP GROWTH")
         with col_t2:
-            subtitle_input = st.text_input("Subtitle", value="TOP PRODUCERS • CYBERPUNK EDITION")
+            subtitle_input = st.text_input("Subtitle", value="VISUALIZING AMERICA IN MOTION")
 
         st.write("### Custom Entity Colors")
         unique_entities = sorted(df['Category'].unique())
@@ -332,23 +366,24 @@ if __name__ == "__main__":
 
         cols = st.columns(4)
         for idx, entity in enumerate(unique_entities):
-            default_hex = DEFAULT_PALETTE[idx % len(DEFAULT_PALETTE)]
+            default_hex = DEFAULT_ACCENT_COLORS[idx % len(DEFAULT_ACCENT_COLORS)]
             with cols[idx % 4]:
                 color_map[entity] = st.color_picker(f"Color: {entity}", value=default_hex, key=f"cp_{entity}")
 
-        if st.button("Generate Vertical Cyberpunk Video"):
+        if st.button("Generate Brand Video"):
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            status_text.text("Pre-downloading flags & rendering frames...")
+            status_text.text("Preparing fonts & flags...")
             progress_bar.progress(30)
             
-            output_path = "bar_chart_race.mp4"
-            generate_race_video(
+            output_path = "statrise_race.mp4"
+            generate_brand_race_video(
                 df,
                 color_map=color_map,
                 title=title_input,
                 subtitle=subtitle_input,
+                theme_choice=theme_choice,
                 output_path=output_path,
                 fps=20,
                 seconds_per_year=1.0
@@ -360,7 +395,7 @@ if __name__ == "__main__":
             with open(output_path, "rb") as vf:
                 st.session_state['video_bytes'] = vf.read()
 
-            st.success("Video generated successfully!")
+            st.success("StatRise brand video generated successfully!")
 
         if 'video_bytes' in st.session_state:
             st.video(st.session_state['video_bytes'])
