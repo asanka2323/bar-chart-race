@@ -9,13 +9,13 @@ from PIL import Image, ImageDraw, ImageFont
 from moviepy import VideoClip
 
 # ---------------------------------------------------------
-# THEME & COLOR PALETTE
+# THEME CONFIGURATION
 # ---------------------------------------------------------
 THEMES = {
     "Light Mode (Default)": {
-        "bg_color": (245, 244, 238),       # #F5F4EE Warm Poster Background
-        "title_color": (18, 30, 66),       # #121E42 Deep Navy Title
-        "subtitle_color": (18, 30, 66),    # #121E42 Deep Navy Subtitle
+        "bg_color": (245, 244, 238),       # Warm Poster Background
+        "title_color": (18, 30, 66),       # Deep Navy Title
+        "subtitle_color": (18, 30, 66),    # Deep Navy Subtitle
         "grid_color": (218, 216, 206),     # Grid lines
         "label_color": (18, 30, 66),      # Dark text for country names
         "value_color": (18, 30, 66),      # Dark text for numbers
@@ -24,13 +24,13 @@ THEMES = {
         "bar_stroke": False
     },
     "Dark Mode (Shorts)": {
-        "bg_color": (15, 23, 42),         # #0F172A Deep Navy
-        "title_color": (249, 250, 251),    # White Title
-        "subtitle_color": (209, 213, 219), # Gray Subtitle
-        "grid_color": (30, 41, 59),       # Grid lines
-        "label_color": (249, 250, 251),   # White Country Names
-        "value_color": (249, 250, 251),   # White Values
-        "year_color": (249, 250, 251),    # White Year
+        "bg_color": (15, 23, 42),         
+        "title_color": (249, 250, 251),    
+        "subtitle_color": (209, 213, 219), 
+        "grid_color": (30, 41, 59),       
+        "label_color": (249, 250, 251),   
+        "value_color": (249, 250, 251),   
+        "year_color": (249, 250, 251),    
         "bar_primary": "#1E3A8A",
         "bar_stroke": True
     }
@@ -50,10 +50,10 @@ COUNTRY_ISO_MAP = {
 }
 
 # ---------------------------------------------------------
-# FAILSAFE TRUETYPE FONT DOWNLOADER
+# RELIABLE DYNAMIC FONT GENERATOR
 # ---------------------------------------------------------
 @st.cache_resource
-def get_bold_font(size):
+def load_font_dynamic(size):
     os.makedirs("fonts", exist_ok=True)
     font_path = "fonts/Montserrat-ExtraBold.ttf"
     
@@ -152,50 +152,52 @@ def fetch_all_flags(df):
     return flag_dict
 
 # ---------------------------------------------------------
-# FRAME RENDERER
+# FRAME RENDERER (SUPER SCALED TYPOGRAPHY)
 # ---------------------------------------------------------
 def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_config, 
-                       title="CAR MANUFACTURING\nAMERICA VS THE WORLD", 
+                       title="I WANT THIS BIG\nTHIS ALSO IN BIG", 
                        subtitle="MEASURED IN UNITS", width=1080, height=1920):
     
     bg_color = theme_config["bg_color"]
+    
+    # Render on a high-res 1080x1920 canvas
     img = Image.new("RGBA", (width, height), bg_color + (255,))
     draw = ImageDraw.Draw(img)
 
-    # 1. LOAD GIANT TRUETYPE FONTS
-    font_main_title = get_bold_font(90)
-    font_subtitle   = get_bold_font(45)
-    font_big_year   = get_bold_font(180)
-    font_label      = get_bold_font(32)
-    font_value      = get_bold_font(32)
+    # 1. LOAD MASSIVE FONTS (EXPANDED TO OCCUPY CANVAS PROPORTIONATELY)
+    font_main_title = load_font_dynamic(110)
+    font_subtitle   = load_font_dynamic(50)
+    font_big_year   = load_font_dynamic(200)
+    font_label      = load_font_dynamic(40)
+    font_value      = load_font_dynamic(40)
 
-    NAVY_COLOR = (18, 30, 66, 255) # Hardcoded Deep Navy (#121E42)
+    NAVY_COLOR = (18, 30, 66, 255)
 
-    # 2. RENDER HUGE TITLE AT TOP LEFT
+    # 2. RENDER MAIN TITLE
     title_lines = str(title).strip().upper().split('\n')
-    y_offset = 80
+    y_offset = 100
     for line in title_lines:
-        draw.text((60, y_offset), line, font=font_main_title, fill=NAVY_COLOR)
+        draw.text((80, y_offset), line, font=font_main_title, fill=NAVY_COLOR)
         bbox = draw.textbbox((0, 0), line, font=font_main_title)
-        y_offset += (bbox[3] - bbox[1]) + 20
+        y_offset += (bbox[3] - bbox[1]) + 25
 
-    # 3. RENDER SUBTITLE DIRECTLY BELOW
-    draw.text((60, y_offset + 10), str(subtitle).strip().upper(), font=font_subtitle, fill=NAVY_COLOR)
+    # 3. RENDER SUBTITLE
+    draw.text((80, y_offset + 15), str(subtitle).strip().upper(), font=font_subtitle, fill=NAVY_COLOR)
 
-    # 4. CHART MARGINS
-    top_margin = y_offset + 120
-    bottom_margin = 250
-    left_margin = 320
-    right_margin = 150
+    # 4. CHART LAYOUT POSITIONS
+    top_margin = y_offset + 140
+    bottom_margin = 280
+    left_margin = 380
+    right_margin = 160
     chart_width = width - left_margin - right_margin
     chart_height = height - top_margin - bottom_margin
 
-    # Background Grid Lines
+    # Grid Lines
     for i in range(5):
         gx = left_margin + (chart_width / 4) * i
-        draw.line([(gx, top_margin), (gx, height - bottom_margin)], fill=(218, 216, 206), width=3)
+        draw.line([(gx, top_margin), (gx, height - bottom_margin)], fill=(218, 216, 206), width=4)
 
-    # 5. BARS & ENTITY LABELS
+    # 5. BARS AND ENTITY LABELS
     max_val = df_frame['Value'].max() if not df_frame.empty and df_frame['Value'].max() > 0 else 1
     top_n = 10
     bar_height = (chart_height / top_n) * 0.58
@@ -215,38 +217,38 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
         color_hex = color_map.get(cat_name, "#121E42")
         color_rgb = hex_to_rgb(color_hex)
 
-        # Label
+        # Entity Label Text
         label_text = cat_name[:12]
-        draw.text((40, y_pos + 10), label_text, font=font_label, fill=NAVY_COLOR)
+        draw.text((60, y_pos + 5), label_text, font=font_label, fill=NAVY_COLOR)
 
-        # Flag
+        # Flag Icon
         icon_img = loaded_flags.get(cat_name)
-        icon_size = int(bar_height * 0.9)
+        icon_size = int(bar_height * 0.95)
         if icon_img:
             icon_resized = icon_img.resize((icon_size, icon_size), Image.Resampling.LANCZOS)
-            img.paste(icon_resized, (220, int(y_pos)), icon_resized)
+            img.paste(icon_resized, (270, int(y_pos)), icon_resized)
 
-        # Bar
+        # Bar Shape
         if bar_w > 5:
             bar_rect = [left_margin, y_pos, left_margin + bar_w, y_pos + bar_height]
-            draw.rounded_rectangle(bar_rect, radius=6, fill=color_rgb)
+            draw.rounded_rectangle(bar_rect, radius=8, fill=color_rgb)
 
-        # Value
+        # Value Text
         val_str = f"{int(val):,}"
-        draw.text((left_margin + bar_w + 15, y_pos + 10), val_str, font=font_value, fill=NAVY_COLOR)
+        draw.text((left_margin + bar_w + 20, y_pos + 5), val_str, font=font_value, fill=NAVY_COLOR)
 
-    # 6. HUGE YEAR DISPLAY (BOTTOM RIGHT)
+    # 6. GIANT YEAR DISPLAY AT BOTTOM RIGHT
     year_str = f"{int(year_label)}"
     bbox_year = draw.textbbox((0, 0), year_str, font=font_big_year)
     year_w = bbox_year[2] - bbox_year[0]
     year_h = bbox_year[3] - bbox_year[1]
     
-    draw.text((width - year_w - 60, height - year_h - 80), year_str, font=font_big_year, fill=NAVY_COLOR)
+    draw.text((width - year_w - 80, height - year_h - 100), year_str, font=font_big_year, fill=NAVY_COLOR)
 
     return np.array(img.convert("RGB"))
 
 # ---------------------------------------------------------
-# VIDEO ENGINE
+# VIDEO GENERATION ENGINE
 # ---------------------------------------------------------
 def generate_brand_race_video(df, color_map, title, subtitle, theme_choice, output_path="statrise_race.mp4", fps=20, seconds_per_year=1.0):
     theme_config = THEMES[theme_choice]
@@ -322,7 +324,7 @@ def generate_brand_race_video(df, color_map, title, subtitle, theme_choice, outp
     )
 
 # ---------------------------------------------------------
-# STREAMLIT USER INTERFACE
+# STREAMLIT APPLICATION INTERFACE
 # ---------------------------------------------------------
 if __name__ == "__main__":
     st.set_page_config(page_title="StatRise Race Studio", layout="wide")
@@ -335,7 +337,7 @@ if __name__ == "__main__":
     st.write("### 1. Video Customization")
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="CAR MANUFACTURING\nAMERICA VS THE WORLD", height=90)
+        title_input = st.text_area("Main Video Title (Use Enter for new lines)", value="I WANT THIS BIG\nTHIS ALSO IN BIG", height=90)
     with col_t2:
         subtitle_input = st.text_input("Subtitle / Unit Measurement", value="MEASURED IN UNITS")
 
@@ -378,7 +380,7 @@ if __name__ == "__main__":
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            status_text.text("Rendering video frames with huge text...")
+            status_text.text("Rendering video frames with scaled fonts...")
             progress_bar.progress(30)
             
             output_path = "statrise_race.mp4"
@@ -399,7 +401,7 @@ if __name__ == "__main__":
             with open(output_path, "rb") as vf:
                 st.session_state['video_bytes'] = vf.read()
 
-            st.success("Chart race video generated successfully with massive typography!")
+            st.success("Chart race video generated successfully!")
 
         if 'video_bytes' in st.session_state:
             st.video(st.session_state['video_bytes'])
