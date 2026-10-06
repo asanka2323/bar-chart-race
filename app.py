@@ -158,11 +158,11 @@ def render_brand_frame(df_frame, year_label, color_map, loaded_flags, theme_conf
     draw = ImageDraw.Draw(img)
 
     # 1. LOAD SYSTEM FONTS AT GIANT SIZES
-    font_main_title = load_system_font(110)
-    font_subtitle   = load_system_font(50)
-    font_big_year   = load_system_font(200)
-    font_label      = load_system_font(40)
-    font_value      = load_system_font(40)
+    font_main_title = load_system_font(100)
+    font_subtitle   = load_system_font(30)
+    font_big_year   = load_system_font(100)
+    font_label      = load_system_font(20)
+    font_value      = load_system_font(20)
 
     NAVY_COLOR = (18, 30, 66, 255)
 
