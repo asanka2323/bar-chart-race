@@ -1,5 +1,5 @@
 streamlit
 pandas
+requests
 pillow
-opencv-python-headless
-moviepy>=2.0.0
+plotly
